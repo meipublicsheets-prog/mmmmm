@@ -285,17 +285,8 @@ function processCustomerOrder(orderData) {
         project: orderData.project,
         items: pickLogItems
       });
-
-      // OutboundLog (detail rows) — PER BIN + SKU
-      addItemsToOutboundLog(ss, {
-        date: orderData.nbdDate,
-        orderId: orderId,
-        taskNumber: orderData.taskNumber,
-        company: orderData.company,
-        project: orderData.project,
-        warehouse: orderData.warehouse || '',
-        items: pickLogItems
-      });
+      // Note: OutboundLog is written during outbound processing (after TOC/Packing slips)
+      // in processPackingTOCAndShipment, not during order creation
     }
 
     const inStockCount = stockCheckResults.filter(sc => sc.status === 'In Stock').length;
