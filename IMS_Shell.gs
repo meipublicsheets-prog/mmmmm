@@ -1,6 +1,8 @@
 // ============================================================================
-// IMS_Shell.gs - MAIN CONTROLLER (Library Version)
+// IMS_Shell.gs - MAIN CONTROLLER (Consolidated Version)
 // ============================================================================
+// All functions are now in the same project - no library wrapper needed.
+// Functions defined in other .gs files are called directly.
 
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
@@ -21,7 +23,7 @@ function onOpen(e) {
   const inventoryToolsMenu = ui.createMenu('Inventory Tools')
     .addItem('Bin Stock Put-Away & Consolidation', 'openStockToolsModal')
     .addItem('Bin Lookup', 'openBinLookupModal')
-    
+
     .addSeparator()
     .addItem('Cycle Count', 'openCycleCountModal');
 
@@ -39,11 +41,6 @@ function onOpen(e) {
     .addToUi();
 }
 
-function onEdit(e) {
-  if (typeof IMS_LIB !== 'undefined' && typeof IMS_LIB.onEdit === 'function') {
-    return IMS_LIB.onEdit(e);
-  }
-}
 function doGet(e) {
   const context = getUserContext();
 
@@ -144,6 +141,7 @@ function showCustomerPortal() {
     .evaluate().setTitle('Inventory Portal');
   SpreadsheetApp.getUi().showSidebar(html);
 }
+
 function openGeneratePastInboundLabelsByDateModal() {
   const html = HtmlService.createTemplateFromFile('LabelDatePickerModal')
     .evaluate()
@@ -151,29 +149,20 @@ function openGeneratePastInboundLabelsByDateModal() {
     .setHeight(360);
   SpreadsheetApp.getUi().showModalDialog(html, 'Generate Past Inbound Labels');
 }
-// ----------------------------------------------------------------------------
-// LIBRARY STUBS
-// ----------------------------------------------------------------------------
-function generateLabelsForAllPastInbounds() {
-  return IMS_LIB.generateLabelsForAllPastInbounds(); 
-}
-function shell_generateLabelsForAllPastInbounds(startDate, endDate) {
-  if (!startDate) throw new Error('startDate is required');
-  // If your library expects (start,end) you’re good; if it expects single day, pass same twice.
-  return IMS_LIB.generateLabelsForAllPastInbounds(startDate, endDate || startDate);
-}
 
-// Inbound Functions (Now working in library)
-function lookupProjectFromPO(customerPO) { return IMS_LIB.lookupProjectFromPO(customerPO); }
-
-function processInboundSubmission(payload) {
+// ----------------------------------------------------------------------------
+// INBOUND SUBMISSION WRAPPER
+// Adds label normalization for InboundModal.html compatibility
+// ----------------------------------------------------------------------------
+function shell_processInboundSubmission(payload) {
   if (!payload) payload = {};
   if (!payload.options) payload.options = {};
 
   // Force labels ON (required)
   payload.options.generateLabels = true;
 
-  const res = IMS_LIB.processInboundSubmission(payload);
+  // Call the actual function from IMS_Inbound.gs
+  const res = processInboundSubmission(payload);
 
   // Normalize for InboundModal.html (expects labelPdfUrl)
   if (res && res.success) {
@@ -193,105 +182,56 @@ function processInboundSubmission(payload) {
 
   return res;
 }
-function generateSkidLabelsHtml(labelData) {
-  return IMS_LIB.generateSkidLabelsHtml_(labelData);
-}
-function getManufacturers() { return IMS_LIB.getManufacturers(); }
-function saveLabelsToDrive(html) { return IMS_LIB.saveLabelsToDrive(html); }
-function processPendingOrderUploads() { return IMS_LIB.processPendingOrderUploads(); }
 
-
-// Other Library Functions
-function getIMSConfig() { return IMS_LIB.getIMSConfig(); }
-function getCompanies() { return IMS_LIB.getCompanies(); }
-function getProjects() { return IMS_LIB.getProjects(); }
-function processCustomerOrder(data) { return IMS_LIB.processCustomerOrder(data); }
-function cancelOrder(id) { return IMS_LIB.cancelOrder(id); }
-function getOutOfStockItems(email) { return IMS_LIB.getOutOfStockItems(email); }
-
-function getTaskNumbers() { return IMS_LIB.getTaskNumbers(); }
-function getOrderByTaskNumber(task) { return IMS_LIB.getOrderByTaskNumber(task); }
-function generatePickTicket(data) { return IMS_LIB.generatePickTicket(data); }
-function processPackingTOCAndShipment(data) { return IMS_LIB.processPackingTOCAndShipment(data); }
-function processPackingTOC_DocsOnly(data) { return IMS_LIB.processPackingTOC_DocsOnly(data); }
-function generateTOC(data) { return IMS_LIB.generateTOC(data); }
-function generatePackingLists(data) { return IMS_LIB.generatePackingLists(data); }
-
-function runOneTimeDeliveredOrderSync() {
-  if (typeof IMS_LIB.runOneTimeDeliveredOrderSync === 'function') return IMS_LIB.runOneTimeDeliveredOrderSync();
-  if (typeof IMS_LIB.forceUpdateDeliveredOrders === 'function') return IMS_LIB.forceUpdateDeliveredOrders();
+function shell_generateLabelsForAllPastInbounds(startDate, endDate) {
+  if (!startDate) throw new Error('startDate is required');
+  // Call the actual function from IMS_Inbound.gs
+  return generateLabelsForAllPastInbounds(startDate, endDate || startDate);
 }
 
-function forceUpdateDeliveredOrders() { return IMS_LIB.forceUpdateDeliveredOrders(); }
-
-function getFBPNList() { return IMS_LIB.getFBPNList(); }
-function getNextSkidIdBase() { return IMS_LIB.getNextSkidIdBase(); }
-function getNextStagingSequence() { return IMS_LIB.getNextStagingSequence(); }
-function updateInboundStaging(stagingRows) { return IMS_LIB.updateInboundStaging(stagingRows); }
-function generateSKU(fbpn, manufacturer) { return IMS_LIB.generateSKU(fbpn, manufacturer); }
-function buildStockSkuFromFBPNAndManufacturer(fbpn, manufacturer) {
-  return IMS_LIB.buildStockSkuFromFBPNAndManufacturer(fbpn, manufacturer);
-}
-
-function fulfillBackorders(ss, fbpn, qtyReceived, txnId) {
-  return IMS_LIB.fulfillBackorders(ss, fbpn, qtyReceived, txnId);
-}
-function updateAllocationWithFulfillment(ss, backorderId, orderId, fbpn, qtyFulfilled) {
-  return IMS_LIB.updateAllocationWithFulfillment(ss, backorderId, orderId, fbpn, qtyFulfilled);
-}
-function updateCustomerOrderStockStatus(ss, orderId) {
-  return IMS_LIB.updateCustomerOrderStockStatus(ss, orderId);
-}
-function addInventoryBatch(data) { return IMS_LIB.addInventoryBatch(data); }
-function removeInventoryBatch(data) { return IMS_LIB.removeInventoryBatch(data); }
-function moveInventoryBatch(data) { return IMS_LIB.moveInventoryBatch(data); }
-function moveFromStaging(data) { return IMS_LIB.moveFromStaging(data); }
+// ----------------------------------------------------------------------------
+// TRANSFER INVENTORY (with moveInventoryBatch fallback)
+// ----------------------------------------------------------------------------
 function transferInventoryBatch(data) {
-  if (typeof IMS_LIB.transferInventoryBatch === 'function') return IMS_LIB.transferInventoryBatch(data);
-  return IMS_LIB.moveInventoryBatch(data);
-}
-function searchBins(params) { return IMS_LIB.searchBins(params); }
-function getBinDetails(bin) { return IMS_LIB.getBinDetails(bin); }
-function getBinHistory(bin) { return IMS_LIB.getBinHistory(bin); }
-function quickBarcodeScan(val) { return IMS_LIB.quickBarcodeScan(val); }
-
-function imsGetCycleCountBins(filter) { return IMS_LIB.imsGetCycleCountBins(filter); }
-function imsCreateCycleCountBatch(data) { return IMS_LIB.imsCreateCycleCountBatch(data); }
-function imsSubmitCycleCountLine(data) { return IMS_LIB.imsSubmitCycleCountLine(data); }
-function imsGetCycleBatch(id) { return IMS_LIB.imsGetCycleBatch(id); }
-
-function generateInboundReport(params) { return IMS_LIB.generateInboundReport(params); }
-function generateOutboundReport(params) { return IMS_LIB.generateOutboundReport(params); }
-function getUserContext() {
-  // Library needs spreadsheet ID since getActiveSpreadsheet() won't work in web app context
-  const ssId = SpreadsheetApp.getActiveSpreadsheet().getId();
-  
-  if (typeof IMS_LIB !== 'undefined' && IMS_LIB.getUserContextForWebApp) {
-    return IMS_LIB.getUserContextForWebApp(ssId);
+  // transferInventoryBatch may not exist - fall back to moveInventoryBatch
+  if (typeof transferInventoryBatch_ === 'function') {
+    return transferInventoryBatch_(data);
   }
-  
-  // Fallback: Direct implementation if library function doesn't exist
+  return moveInventoryBatch(data);
+}
+
+// ----------------------------------------------------------------------------
+// USER CONTEXT
+// ----------------------------------------------------------------------------
+function getUserContext() {
+  const ssId = SpreadsheetApp.getActiveSpreadsheet().getId();
+
+  // Call getUserContextForWebApp from IMS_Webapp.gs if available
+  if (typeof getUserContextForWebApp === 'function') {
+    return getUserContextForWebApp(ssId);
+  }
+
+  // Fallback: Direct implementation
   return getUserContextDirect_();
 }
 
 /**
  * Direct implementation fallback for getUserContext
- * Used if library doesn't have getUserContextForWebApp
  */
 function getUserContextDirect_() {
   try {
     const email = Session.getActiveUser().getEmail();
-    
+
     if (!email) {
       return {
         authenticated: false,
         error: 'Unable to retrieve user email. Please ensure you are signed in.'
       };
     }
-    
+
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Customer_Access');
-    
+
     if (!sheet) {
       Logger.log('Customer_Access sheet not found');
       return {
@@ -299,48 +239,47 @@ function getUserContextDirect_() {
         error: 'System configuration error: Customer_Access sheet not found.'
       };
     }
-    
+
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
-    
+
     const emailCol = headers.indexOf('Email');
     const nameCol = headers.indexOf('Name');
     const companyCol = headers.indexOf('Company Name');
     const accessCol = headers.indexOf('Access_Level');
     const projectCol = headers.indexOf('Project_Access');
     const activeCol = headers.indexOf('Active');
-    
+
     const normalizedEmail = email.toLowerCase().trim();
-    
+
     for (let i = 1; i < data.length; i++) {
       const rowEmail = String(data[i][emailCol] || '').toLowerCase().trim();
-      
+
       if (rowEmail === normalizedEmail) {
         const projectAccessRaw = String(data[i][projectCol] || '').trim();
-        const projectAccess = projectAccessRaw.toUpperCase() === 'ALL' 
-          ? ['ALL'] 
+        const projectAccess = projectAccessRaw.toUpperCase() === 'ALL'
+          ? ['ALL']
           : projectAccessRaw.split(',').map(p => p.trim()).filter(p => p);
-        
+
         const activeRaw = data[i][activeCol];
-        // Handle various formats: TRUE, true, Yes, Y, 1, or checkbox true
-        const isActive = activeRaw === true || 
-                         String(activeRaw).toUpperCase() === 'TRUE' || 
-                         String(activeRaw).toUpperCase() === 'YES' || 
+        const isActive = activeRaw === true ||
+                         String(activeRaw).toUpperCase() === 'TRUE' ||
+                         String(activeRaw).toUpperCase() === 'YES' ||
                          String(activeRaw).toUpperCase() === 'Y' ||
                          String(activeRaw).toUpperCase() === 'ACTIVE' ||
                          activeRaw === 1 ||
                          String(activeRaw) === '1' ||
-                         (activeCol < 0); // If no Active column exists, assume active
-        
+                         (activeCol < 0);
+
         if (!isActive) {
           return {
             authenticated: false,
             error: 'Your account has been deactivated.'
           };
         }
-        
+
         const accessLevel = data[i][accessCol] || 'Standard';
-        
+
         return {
           authenticated: true,
           email: email,
@@ -354,14 +293,13 @@ function getUserContextDirect_() {
         };
       }
     }
-    
-    // User not found - deny access
+
     Logger.log('Access denied for unregistered user: ' + email);
     return {
       authenticated: false,
       error: 'Access denied. Your email is not registered in the system.'
     };
-    
+
   } catch (error) {
     Logger.log('getUserContext error: ' + error.toString());
     return {
@@ -378,7 +316,7 @@ function buildPermissionsFromLevel_(accessLevel) {
   const level = String(accessLevel || '').toUpperCase();
   const isMEI = level === 'MEI';
   const isTurner = level === 'TURNER';
-  
+
   return {
     isAdmin: isMEI,
     canViewAllOrders: isMEI || isTurner,
@@ -395,24 +333,23 @@ function buildPermissionsFromLevel_(accessLevel) {
 // WEBAPP FORWARDERS - DASHBOARD
 // ============================================================================
 
-function getDashboardMetrics() {
-  if (typeof IMS_LIB !== 'undefined' && IMS_LIB.getDashboardMetrics) {
-    return IMS_LIB.getDashboardMetrics();
+function shell_getDashboardMetrics() {
+  // Call getDashboardMetrics from IMS_Webapp.gs if available
+  if (typeof getDashboardMetrics === 'function') {
+    return getDashboardMetrics();
   }
   return getDashboardMetricsDirect_();
 }
 
 function getDashboardMetricsDirect_() {
-  // Basic implementation - returns sample metrics
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const metrics = {
     orders: { pending: 0, processing: 0, shipped: 0 },
     inventory: { totalSKUs: 0, lowStock: 0, outOfStock: 0 },
     inbound: { scheduled: 0, received: 0 }
   };
-  
+
   try {
-    // Count orders by status
     const ordersSheet = ss.getSheetByName('Customer_Orders');
     if (ordersSheet) {
       const ordersData = ordersSheet.getDataRange().getValues();
@@ -426,8 +363,7 @@ function getDashboardMetricsDirect_() {
         }
       }
     }
-    
-    // Count SKUs
+
     const stockSheet = ss.getSheetByName('Stock_Totals');
     if (stockSheet) {
       metrics.inventory.totalSKUs = Math.max(0, stockSheet.getLastRow() - 1);
@@ -435,7 +371,7 @@ function getDashboardMetricsDirect_() {
   } catch (e) {
     Logger.log('getDashboardMetrics error: ' + e.toString());
   }
-  
+
   return { success: true, metrics: metrics };
 }
 
@@ -443,9 +379,10 @@ function getDashboardMetricsDirect_() {
 // WEBAPP FORWARDERS - CUSTOMER ORDERS
 // ============================================================================
 
-function getCustomerOrders(context) {
-  if (typeof IMS_LIB !== 'undefined' && IMS_LIB.getCustomerOrdersForWebApp) {
-    return IMS_LIB.getCustomerOrdersForWebApp(context);
+function shell_getCustomerOrders(context) {
+  // Call getCustomerOrdersForWebApp from IMS_Webapp.gs if available
+  if (typeof getCustomerOrdersForWebApp === 'function') {
+    return getCustomerOrdersForWebApp(context);
   }
   return getCustomerOrdersDirect_(context);
 }
@@ -454,35 +391,35 @@ function getCustomerOrdersDirect_(context) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Customer_Orders');
-    
+
     if (!sheet) {
       return { success: false, message: 'Customer_Orders sheet not found', orders: [] };
     }
-    
+
     const data = sheet.getDataRange().getValues();
     if (data.length < 2) {
       return { success: true, orders: [] };
     }
-    
+
     const headers = data[0];
     const colMap = {};
-    ['Order_ID', 'Task_Number', 'Project', 'NBD', 'Company', 'Order_Title', 
+    ['Order_ID', 'Task_Number', 'Project', 'NBD', 'Company', 'Order_Title',
      'Deliver_To', 'Request_Status', 'Stock_Status', 'Created_TS'].forEach(h => {
       colMap[h] = headers.indexOf(h);
     });
-    
+
     const orders = [];
-    const userCompany = (context && context.accessLevel === 'Standard' && context.company) 
+    const userCompany = (context && context.accessLevel === 'Standard' && context.company)
       ? context.company.toLowerCase() : '';
-    
+
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       const orderId = colMap['Order_ID'] >= 0 ? row[colMap['Order_ID']] : '';
       if (!orderId) continue;
-      
+
       const rowCompany = colMap['Company'] >= 0 ? String(row[colMap['Company']] || '').toLowerCase() : '';
       if (userCompany && rowCompany !== userCompany) continue;
-      
+
       orders.push({
         orderId: String(orderId),
         taskNumber: colMap['Task_Number'] >= 0 ? String(row[colMap['Task_Number']] || '') : '',
@@ -495,9 +432,9 @@ function getCustomerOrdersDirect_(context) {
         createdAt: colMap['Created_TS'] >= 0 ? formatDate_(row[colMap['Created_TS']]) : ''
       });
     }
-    
+
     orders.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-    
+
     return { success: true, orders: orders, totalCount: orders.length };
   } catch (error) {
     return { success: false, message: error.toString(), orders: [] };
@@ -518,30 +455,27 @@ function formatDate_(value) {
 
 /**
  * Regenerate a document for an existing order
- * Matches the data format expected by SHIPPING_DOCS.js functions
  */
 function regenerateOrderDoc(orderId, docType) {
   try {
     if (!orderId) {
       return { success: false, message: 'Order ID is required' };
     }
-    
-    // Get full order data with items
+
     const orderData = getFullOrderData_(orderId);
-    
+
     if (!orderData) {
       return { success: false, message: 'Order not found: ' + orderId };
     }
-    
+
     if (!orderData.items || orderData.items.length === 0) {
       return { success: false, message: 'No items found for order: ' + orderId };
     }
-    
+
     let result;
-    
+
     switch (docType) {
       case 'PICK':
-        // Pick Ticket uses orderNumber to look up from Pick_Log, or falls back to items
         const pickData = {
           orderNumber: orderData.orderNumber,
           orderId: orderData.orderId,
@@ -558,18 +492,17 @@ function regenerateOrderDoc(orderId, docType) {
             qty: item.qtyRequested
           }))
         };
-        
-        if (typeof IMS_LIB !== 'undefined' && typeof IMS_LIB.generatePickTicket === 'function') {
-          result = IMS_LIB.generatePickTicket(pickData);
+
+        // Call generatePickTicket from SHIPPING_DOCS.gs
+        if (typeof generatePickTicket === 'function') {
+          result = generatePickTicket(pickData);
         } else {
-          return { success: false, message: 'generatePickTicket function not available in library' };
+          return { success: false, message: 'generatePickTicket function not available' };
         }
         break;
-        
+
       case 'PACKING':
       case 'TOC':
-        // TOC and Packing Lists require skids structure
-        // Build skids from items - put all items on one skid as default
         const skids = [{
           skidNumber: 1,
           items: orderData.items.map(item => ({
@@ -580,7 +513,7 @@ function regenerateOrderDoc(orderId, docType) {
             qty: item.qtyRequested
           }))
         }];
-        
+
         const docData = {
           orderNumber: orderData.orderNumber,
           orderId: orderData.orderId,
@@ -597,26 +530,28 @@ function regenerateOrderDoc(orderId, docType) {
           skids: skids,
           items: orderData.items
         };
-        
+
         if (docType === 'TOC') {
-          if (typeof IMS_LIB !== 'undefined' && typeof IMS_LIB.generateTOC === 'function') {
-            result = IMS_LIB.generateTOC(docData);
+          // Call generateTOC from SHIPPING_DOCS.gs
+          if (typeof generateTOC === 'function') {
+            result = generateTOC(docData);
           } else {
-            return { success: false, message: 'generateTOC function not available in library' };
+            return { success: false, message: 'generateTOC function not available' };
           }
         } else {
-          if (typeof IMS_LIB !== 'undefined' && typeof IMS_LIB.generatePackingLists === 'function') {
-            result = IMS_LIB.generatePackingLists(docData);
+          // Call generatePackingLists from SHIPPING_DOCS.gs
+          if (typeof generatePackingLists === 'function') {
+            result = generatePackingLists(docData);
           } else {
-            return { success: false, message: 'generatePackingLists function not available in library' };
+            return { success: false, message: 'generatePackingLists function not available' };
           }
         }
         break;
-        
+
       default:
         return { success: false, message: 'Invalid document type: ' + docType };
     }
-    
+
     if (result && (result.success || result.pdfUrl || result.url)) {
       return {
         success: true,
@@ -627,7 +562,7 @@ function regenerateOrderDoc(orderId, docType) {
     } else {
       return { success: false, message: result ? result.message : 'Document generation failed' };
     }
-    
+
   } catch (e) {
     Logger.log('regenerateOrderDoc error: ' + e.toString());
     return { success: false, message: 'Error: ' + e.toString() };
@@ -641,11 +576,10 @@ function getFullOrderData_(orderId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const orderSheet = ss.getSheetByName('Customer_Orders');
   if (!orderSheet) return null;
-  
+
   const orderData = orderSheet.getDataRange().getValues();
   const orderHeaders = orderData[0];
-  
-  // Build column map with flexible header matching
+
   const findCol = (names) => {
     const normalized = orderHeaders.map(h => String(h || '').toLowerCase().trim().replace(/[_\s]+/g, '_'));
     for (const name of names) {
@@ -654,7 +588,7 @@ function getFullOrderData_(orderId) {
     }
     return -1;
   };
-  
+
   const col = {
     orderId: findCol(['order_id', 'order_number', 'orderid']),
     taskNumber: findCol(['task_number', 'task_number', 'task']),
@@ -668,8 +602,7 @@ function getFullOrderData_(orderId) {
     status: findCol(['request_status', 'status']),
     shipDate: findCol(['ship_date', 'shipped_date'])
   };
-  
-  // Find the order
+
   let orderRow = null;
   for (let i = 1; i < orderData.length; i++) {
     const rowOrderId = col.orderId >= 0 ? String(orderData[i][col.orderId]) : '';
@@ -678,10 +611,9 @@ function getFullOrderData_(orderId) {
       break;
     }
   }
-  
+
   if (!orderRow) return null;
-  
-  // Build order object with all required fields
+
   const order = {
     orderNumber: String(orderId),
     orderId: String(orderId),
@@ -697,15 +629,14 @@ function getFullOrderData_(orderId) {
     shipDate: col.shipDate >= 0 ? formatDate_(orderRow[col.shipDate]) : '',
     date: new Date().toLocaleDateString()
   };
-  
-  // Get items from Requested_Items
+
   const itemsSheet = ss.getSheetByName('Requested_Items');
   order.items = [];
-  
+
   if (itemsSheet) {
     const itemsData = itemsSheet.getDataRange().getValues();
     const itemHeaders = itemsData[0];
-    
+
     const findItemCol = (names) => {
       const normalized = itemHeaders.map(h => String(h || '').toLowerCase().trim().replace(/[_\s]+/g, '_'));
       for (const name of names) {
@@ -714,7 +645,7 @@ function getFullOrderData_(orderId) {
       }
       return -1;
     };
-    
+
     const itemCol = {
       orderId: findItemCol(['order_id', 'order_number']),
       fbpn: findItemCol(['fbpn']),
@@ -722,15 +653,14 @@ function getFullOrderData_(orderId) {
       qtyRequested: findItemCol(['qty_requested', 'qty', 'quantity']),
       sku: findItemCol(['sku'])
     };
-    
+
     for (let i = 1; i < itemsData.length; i++) {
       const rowOrderId = itemCol.orderId >= 0 ? String(itemsData[i][itemCol.orderId]) : '';
-      
-      // Match order ID (handle numeric vs string)
+
       if (rowOrderId === String(orderId) || rowOrderId === String(Math.trunc(Number(orderId)))) {
         const fbpn = itemCol.fbpn >= 0 ? String(itemsData[i][itemCol.fbpn] || '').trim() : '';
         if (!fbpn) continue;
-        
+
         order.items.push({
           fbpn: fbpn,
           description: itemCol.description >= 0 ? String(itemsData[i][itemCol.description] || '') : '',
@@ -741,7 +671,7 @@ function getFullOrderData_(orderId) {
       }
     }
   }
-  
+
   return order;
 }
 
@@ -751,31 +681,31 @@ function getFullOrderData_(orderId) {
 
 /**
  * Get order data formatted for the shipping docs modal
- * This is called when opening the shipping modal from Customer Orders
  */
 function getOrderDataForShipping(orderId) {
   return getFullOrderData_(orderId);
 }
 
 /**
- * Get order by task number - wrapper for library function
+ * Get order by task number - fallback implementation
+ * Primary implementation is in SHIPPING_DOCS.gs
  */
-function getOrderByTaskNumber(taskNumber) {
-  if (typeof IMS_LIB !== 'undefined' && typeof IMS_LIB.getOrderByTaskNumber === 'function') {
-    return IMS_LIB.getOrderByTaskNumber(taskNumber);
+function shell_getOrderByTaskNumber(taskNumber) {
+  // Use the implementation from SHIPPING_DOCS.gs if available
+  if (typeof getOrderByTaskNumber === 'function') {
+    return getOrderByTaskNumber(taskNumber);
   }
-  
+
   // Fallback implementation
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const orderSheet = ss.getSheetByName('Customer_Orders');
   const itemsSheet = ss.getSheetByName('Requested_Items');
-  
+
   if (!orderSheet || !itemsSheet) return null;
-  
+
   const orderData = orderSheet.getDataRange().getValues();
   const orderHeaders = orderData[0];
-  
-  // Find column indices with flexible matching
+
   const findCol = (headers, names) => {
     const normalized = headers.map(h => String(h || '').toLowerCase().trim().replace(/[_\s]+/g, '_'));
     for (const name of names) {
@@ -784,7 +714,7 @@ function getOrderByTaskNumber(taskNumber) {
     }
     return -1;
   };
-  
+
   const cTask = findCol(orderHeaders, ['task_number', 'task']);
   const cOrder = findCol(orderHeaders, ['order_id', 'order_number']);
   const cProj = findCol(orderHeaders, ['project']);
@@ -793,57 +723,54 @@ function getOrderByTaskNumber(taskNumber) {
   const cDeliver = findCol(orderHeaders, ['deliver_to', 'delivery_address']);
   const cName = findCol(orderHeaders, ['name', 'contact_name']);
   const cPhone = findCol(orderHeaders, ['phone_number', 'phone']);
-  
-  // Find order row
+
   const key = String(taskNumber).trim();
   let orderRow = null;
-  
+
   for (let r = 1; r < orderData.length; r++) {
     const row = orderData[r];
     const vTask = cTask >= 0 ? String(row[cTask] || '').trim() : '';
     const vOrder = cOrder >= 0 ? String(row[cOrder] || '').trim() : '';
-    
-    if (vTask === key || vOrder === key || 
-        String(Math.trunc(Number(vTask))) === key || 
+
+    if (vTask === key || vOrder === key ||
+        String(Math.trunc(Number(vTask))) === key ||
         String(Math.trunc(Number(vOrder))) === key) {
       orderRow = row;
       break;
     }
   }
-  
+
   if (!orderRow) return null;
-  
+
   const orderId = (cOrder >= 0 ? String(orderRow[cOrder] || '') : '') || key;
-  
-  // Get items
+
   const itemsData = itemsSheet.getDataRange().getValues();
   const itemHeaders = itemsData[0];
-  
+
   const iOrder = findCol(itemHeaders, ['order_id', 'order_number', 'task_number']);
   const iFbpn = findCol(itemHeaders, ['fbpn']);
   const iDesc = findCol(itemHeaders, ['description', 'desc']);
   const iQty = findCol(itemHeaders, ['qty_requested', 'qty']);
-  
+
   const items = [];
   const matchKeys = [key, orderId, String(Math.trunc(Number(key))), String(Math.trunc(Number(orderId)))];
-  
+
   for (let j = 1; j < itemsData.length; j++) {
     const row = itemsData[j];
     const ok = iOrder >= 0 ? String(row[iOrder] || '').trim() : '';
-    
+
     if (!matchKeys.includes(ok)) continue;
-    
+
     const fbpn = iFbpn >= 0 ? String(row[iFbpn] || '').trim() : '';
     if (!fbpn) continue;
-    
+
     items.push({
       fbpn: fbpn,
       description: iDesc >= 0 ? String(row[iDesc] || '') : '',
       qtyRequested: iQty >= 0 ? Number(row[iQty] || 0) : 0
     });
   }
-  
-  // Combine duplicate FBPNs
+
   const combined = {};
   items.forEach(item => {
     if (!combined[item.fbpn]) {
@@ -852,7 +779,7 @@ function getOrderByTaskNumber(taskNumber) {
       combined[item.fbpn].qtyRequested += item.qtyRequested;
     }
   });
-  
+
   return {
     orderId: orderId,
     orderNumber: orderId,
@@ -872,24 +799,25 @@ function getOrderByTaskNumber(taskNumber) {
 
 const AUTOMATION_FOLDER_ID = '1L3mjeQizzjVU5uTqGxv1sOUOuq25I2pM';
 
-function uploadToAutomationFolder(fileData) {
-  if (typeof IMS_LIB !== 'undefined' && IMS_LIB.uploadToAutomationFolder) {
-    return IMS_LIB.uploadToAutomationFolder(fileData);
+function shell_uploadToAutomationFolder(fileData) {
+  // Use the implementation from CustomerOrderBackend.gs if available
+  if (typeof uploadToAutomationFolder === 'function') {
+    return uploadToAutomationFolder(fileData);
   }
-  
+
   try {
     if (!fileData || !fileData.content || !fileData.fileName) {
       return { success: false, message: 'Missing file data' };
     }
-    
+
     const folder = DriveApp.getFolderById(AUTOMATION_FOLDER_ID);
     const decoded = Utilities.base64Decode(fileData.content);
-    const blob = Utilities.newBlob(decoded, 
-      fileData.mimeType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 
+    const blob = Utilities.newBlob(decoded,
+      fileData.mimeType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       fileData.fileName);
-    
+
     const file = folder.createFile(blob);
-    
+
     return {
       success: true,
       message: 'File uploaded. It will be processed automatically.',
@@ -908,15 +836,18 @@ function getCompaniesFiltered(context) {
   if (context && context.accessLevel === 'Standard' && context.company) {
     return [context.company];
   }
-  return typeof IMS_LIB !== 'undefined' && IMS_LIB.getCompanies ? 
-    IMS_LIB.getCompanies() : getCompaniesDirect_();
+  // Use getCompanies from CustomerOrderBackend.gs
+  if (typeof getCompanies === 'function') {
+    return getCompanies();
+  }
+  return getCompaniesDirect_();
 }
 
 function getCompaniesDirect_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Support_Sheet');
   if (!sheet) return [];
-  
+
   const data = sheet.getDataRange().getValues();
   const companies = new Set();
   for (let i = 1; i < data.length; i++) {
@@ -929,14 +860,14 @@ function getProjectsFiltered(company) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Support_Sheet');
   if (!sheet) return [];
-  
+
   const data = sheet.getDataRange().getValues();
   const projects = new Set();
-  
+
   for (let i = 1; i < data.length; i++) {
     const rowCompany = String(data[i][0] || '').trim();
     const rowProject = String(data[i][1] || '').trim();
-    
+
     if (rowProject) {
       if (company && rowCompany.toLowerCase() === company.toLowerCase()) {
         projects.add(rowProject);
@@ -952,11 +883,11 @@ function getNextTaskNumber() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Customer_Orders');
   if (!sheet) return '1001';
-  
+
   const data = sheet.getDataRange().getValues();
   const taskCol = data[0].indexOf('Task_Number');
   if (taskCol < 0) return '1001';
-  
+
   let maxNum = 1000;
   for (let i = 1; i < data.length; i++) {
     const num = parseInt(String(data[i][taskCol]).replace(/\D/g, ''), 10);
@@ -969,14 +900,14 @@ function validateFBPN(fbpn) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Project_Master');
   if (!sheet) return { valid: false, message: 'Project_Master not found' };
-  
+
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
   const fbpnCol = headers.indexOf('FBPN');
   const descCol = headers.indexOf('Description');
-  
+
   if (fbpnCol < 0) return { valid: false, message: 'FBPN column not found' };
-  
+
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][fbpnCol]).toLowerCase() === fbpn.toLowerCase()) {
       return {
@@ -988,6 +919,7 @@ function validateFBPN(fbpn) {
   }
   return { valid: false, message: 'FBPN not found' };
 }
+
 function api_getSkidById(skidId) {
   const ss = SpreadsheetApp.getActive();
   const sh = ss.getSheetByName('Inbound_Skids');
@@ -1020,17 +952,60 @@ function api_getSkidById(skidId) {
   }
   return { success:false, message:`Skid not found: ${id}` };
 }
-function searchInboundByBOL(bol) { return IMS_LIB.searchInboundByBOL(bol); }
-function executeUndoByTxnId(txnId) { return IMS_LIB.executeUndoByTxnId(txnId); }
-function getRecentInboundTransactions(limit) { return IMS_LIB.getRecentInboundTransactions(limit); }
-function regenerateLabelsForTxn(txnId) { return IMS_LIB.regenerateLabelsForTxn(txnId); }
-function generateManualLabel(data) { return IMS_LIB.generateManualLabel(data); }
-function generateLabelsByBOL(bol) { return IMS_LIB.generateLabelsByBOL(bol); }
 
-function authenticateUser(email) { return IMS_LIB.authenticateUser(email); }
-function searchInventoryForCustomer(email, criteria) { return IMS_LIB.searchInventoryForCustomer(email, criteria); }
-function getCustomerOrders(email) { return IMS_LIB.getCustomerOrders(email); }
-function getAvailableFBPNsForOrder(email) { return IMS_LIB.getAvailableFBPNsForOrder(email); }
-function submitCustomerOrderFromPortal(email, data) { return IMS_LIB.submitCustomerOrderFromPortal(email, data); }
-function getUserProjectAccess(email) { return IMS_LIB.getUserProjectAccess(email); }
-function getProjectsForPortal() { return IMS_LIB.getProjectsForPortal(); }
+// ============================================================================
+// CUSTOMER PORTAL STUBS (Not yet implemented - were library placeholders)
+// ============================================================================
+
+function authenticateUser(email) {
+  // This was a library placeholder - implement based on getUserContext
+  const context = getUserContext();
+  if (context.authenticated && context.email.toLowerCase() === email.toLowerCase()) {
+    return context;
+  }
+  return { authenticated: false, error: 'User not authenticated' };
+}
+
+function searchInventoryForCustomer(email, criteria) {
+  throw new Error('searchInventoryForCustomer is not yet implemented');
+}
+
+function getAvailableFBPNsForOrder(email) {
+  throw new Error('getAvailableFBPNsForOrder is not yet implemented');
+}
+
+function submitCustomerOrderFromPortal(email, data) {
+  throw new Error('submitCustomerOrderFromPortal is not yet implemented');
+}
+
+function getUserProjectAccess(email) {
+  const context = getUserContext();
+  if (context.authenticated && context.email.toLowerCase() === email.toLowerCase()) {
+    return context.projectAccess || [];
+  }
+  return [];
+}
+
+function getProjectsForPortal() {
+  // Use getProjects from CustomerOrderBackend.gs
+  if (typeof getProjects === 'function') {
+    return getProjects();
+  }
+  return [];
+}
+
+function getOutOfStockItems(email) {
+  throw new Error('getOutOfStockItems is not yet implemented');
+}
+
+// ============================================================================
+// SKID LABEL HTML WRAPPER
+// ============================================================================
+
+function generateSkidLabelsHtml(labelData) {
+  // Call generateSkidLabelsHtml_ from IMS_Inbound.gs
+  if (typeof generateSkidLabelsHtml_ === 'function') {
+    return generateSkidLabelsHtml_(labelData);
+  }
+  throw new Error('generateSkidLabelsHtml_ function not available');
+}
