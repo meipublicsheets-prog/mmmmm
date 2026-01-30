@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include('BinUpdateStyles'); ?>
+  <script>
+    let entryCount = 1;
+    let fbpnList = [];
+    let binCodeList = [];
+
+    window.onload = function() {
+      loadAutocompleteData();
+    };
+
+    function loadAutocompleteData() {
+      google.script.run
+        .withSuccessHandler(function(fbpns) {
+          fbpnList = fbpns;
+          updateDatalist('fbpnDatalist', fbpns);
+        })
+        .getFBPNs();
+
+      google.script.run
+        .withSuccessHandler(function(bins) {
+          binCodeList = bins;
+          updateDatalist('binCodeDatalist', bins);
+        })
+        .getBinCodes();
+    }
+
+    function updateDatalist(datalistId, items) {
+      const datalist = document.getElementById(datalistId);
+      datalist.innerHTML = '';
+      items.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item;
+        datalist.appendChild(option);
+      });
+    }
+
+    function addEntry() {
+      entryCount++;
+      const container = document.getElementById('entriesContainer');
+
+      const entryDiv = document.createElement('div');
+      entryDiv.className = 'entry-card';
+      entryDiv.id = 'entry-' + entryCount;
+      entryDiv.innerHTML = `
+        <div class="entry-header">
+          <span class="entry-number">Entry #${entryCount}</span>
+          <button class="remove-entry-btn" onclick="removeEntry(${entryCount})">✕ Remove</button>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">FBPN</label>
+            <input type="text" class="form-input fbpn-input" list="fbpnDatalist" placeholder="Enter FBPN">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Bin Code</label>
+            <input type="text" class="form-input bin-input" list="binCodeDatalist" placeholder="e.g., A1.1">
+          </div>
+          <div class="form-group">
+            <label class="form-label required">Qty to Remove</label>
+            <input type="number" class="form-input qty-remove-input" placeholder="Quantity" min="1">
+          </div>
+        </div>
+        <div class="alert alert-info" style="margin-top: 12px; font-size: 0.8rem; padding: 10px;">
+          Provide either FBPN or Bin Code (or both)
+        </div>
+      `;
+
+      container.appendChild(entryDiv);
+    }
+    
+    function removeEntry(entryId) {
+      const entry = document.getElementById('entry-' + entryId);
+      if (entry) {
+        entry.remove();
+      }
+    }
+    
+    function submitRemoveInventory() {
+      const entries = document.querySelectorAll('.entry-card');
+      const items = [];
+      let hasErrors = false;
+      
+      entries.forEach(entry => {
+        const fbpn = entry.querySelector('.fbpn-input').value.trim();
+        const binCode = entry.querySelector('.bin-input').value.trim();
+        const qtyToRemove = entry.querySelector('.qty-remove-input').value;
+        
+        if ((!fbpn && !binCode) || !qtyToRemove) {
+          hasErrors = true;
+          entry.style.borderColor = 'var(--danger)';
+        } else {
+          entry.style.borderColor = 'var(--border-color)';
+          items.push({
+            fbpn: fbpn,
+            binCode: binCode,
+            qtyToRemove: parseInt(qtyToRemove)
+          });
+        }
+      });
+      
+      if (hasErrors) {
+        showAlert('Each entry must have FBPN or Bin Code, and Qty to Remove', 'danger');
+        return;
+      }
+      
+      if (items.length === 0) {
+        showAlert('Please add at least one entry', 'warning');
+        return;
+      }
+      
+      showLoading(true);
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          showLoading(false);
+          if (result.success) {
+            showAlert(result.message, 'success');
+            setTimeout(() => {
+              google.script.host.close();
+            }, 2000);
+          } else {
+            showAlert(result.message, 'danger');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showLoading(false);
+          showAlert('Error: ' + error.message, 'danger');
+        })
+        .removeInventoryBatch(items);
+    }
+    
+    function showAlert(message, type) {
+      const alertDiv = document.createElement('div');
+      alertDiv.className = `alert alert-${type}`;
+      alertDiv.textContent = message;
+      
+      const container = document.querySelector('.glass-container');
+      const header = container.querySelector('.header');
+      header.parentNode.insertBefore(alertDiv, header.nextSibling);
+      
+      setTimeout(() => alertDiv.remove(), 5000);
+    }
+    
+    function showLoading(show) {
+      const overlay = document.getElementById('loadingOverlay');
+      if (show) {
+        overlay.classList.add('active');
+      } else {
+        overlay.classList.remove('active');
+      }
+    }
+  </script>
+</head>
+<body>
+  <div class="glass-container">
+    <div class="header">
+      <h1>➖ Remove Inventory from Bins</h1>
+      <p>Remove inventory from bin locations - bins will be cleared when quantity reaches zero</p>
+    </div>
+    
+    <div class="entries-container" id="entriesContainer">
+      <div class="entry-card" id="entry-1">
+        <div class="entry-header">
+          <span class="entry-number">Entry #1</span>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">FBPN</label>
+            <input type="text" class="form-input fbpn-input" list="fbpnDatalist" placeholder="Enter FBPN">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Bin Code</label>
+            <input type="text" class="form-input bin-input" list="binCodeDatalist" placeholder="e.g., A1.1">
+          </div>
+          <div class="form-group">
+            <label class="form-label required">Qty to Remove</label>
+            <input type="number" class="form-input qty-remove-input" placeholder="Quantity" min="1">
+          </div>
+        </div>
+        <div class="alert alert-info" style="margin-top: 12px; font-size: 0.8rem; padding: 10px;">
+          Provide either FBPN or Bin Code (or both)
+        </div>
+      </div>
+    </div>
+
+    <div class="button-group">
+      <button class="btn btn-secondary" onclick="addEntry()">➕ Add Another Entry</button>
+      <button class="btn btn-secondary" onclick="google.script.host.close()">Close</button>
+      <button class="btn btn-success" onclick="submitRemoveInventory()">✓ Submit All Entries</button>
+    </div>
+  </div>
+
+  <datalist id="fbpnDatalist"></datalist>
+  <datalist id="binCodeDatalist"></datalist>
+
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Removing inventory...</div>
+  </div>
+</body>
+</html>

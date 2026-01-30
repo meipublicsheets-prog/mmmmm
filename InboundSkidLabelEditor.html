@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <?!= include('UniversalStyles'); ?>
+    <style>
+        /* ---------- Responsive container ---------- */
+        .wrap {
+            width: 100%;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 10px;
+        }
+
+        @media (min-width: 1400px) {
+            .wrap {
+                max-width: 1240px;
+            }
+        }
+
+        /* ---------- Responsive grids ---------- */
+        .grid2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 12px;
+        }
+
+        .help {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            margin-top: 6px;
+        }
+
+        .pill {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.04);
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .toolbar .btn {
+            min-width: 110px;
+        }
+
+        /* ---------- Table fit ---------- */
+        .table-wrap {
+            overflow: auto;
+            border-radius: var(--radius-sm);
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 8px 10px;
+        }
+
+        .data-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .muted {
+            color: var(--text-muted);
+        }
+
+        /* ---------- Inputs tighter ---------- */
+        .form-input {
+            height: 40px;
+            padding: 8px 10px;
+        }
+
+        input.form-input[type="number"] {
+            max-width: 140px;
+        }
+
+        /* ---------- Footer ---------- */
+        .section-footer {
+            margin-top: 12px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .section-footer .btn {
+            min-width: 160px;
+        }
+
+        /* ---------- Save links ---------- */
+        .alert-success a {
+            color: var(--primary-600, #2563eb);
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .alert-success a:hover {
+            text-decoration: underline;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* ---------- Skid controls (dropdown + type) ---------- */
+        .skid-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            align-items: end;
+        }
+
+        @media (max-width: 720px) {
+            .skid-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .skid-row select {
+            height: 40px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="loading-overlay" id="loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text" id="loadingText">Loading…</div>
+    </div>
+
+    <div class="modal-container wrap">
+        <div class="modal-header">
+            <h1>Inbound Skid Label Editor</h1>
+            <p>Edit generated inbound skid labels and regenerate PDFs.</p>
+        </div>
+
+        <div class="tab-content active">
+            <div class="section">
+                <div class="section-title">
+                    Find Labels <span class="pill" id="metaCount">0 labels</span>
+                </div>
+
+                <div class="grid2">
+                    <div class="form-group">
+                        <label class="form-label required" for="bolInput">BOL Number</label>
+                        <input id="bolInput" type="text" class="form-input" placeholder="Enter BOL Number"
+                            autocomplete="off">
+                        <div class="help">Type BOL — skids will auto-load.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label required">Skid ID</label>
+
+                        <div class="skid-row">
+                            <div class="col">
+                                <label class="form-label" style="font-size:12px; margin-top:0;">Drop-down</label>
+                                <select id="skidSelect" class="form-input" disabled>
+                                    <option value="">Select Skid…</option>
+                                </select>
+                            </div>
+
+                            <div class="col">
+                                <label class="form-label" style="font-size:12px; margin-top:0;">Type-in</label>
+                                <input id="skidInput" class="form-input" type="text" placeholder="Type Skid ID"
+                                    autocomplete="off" disabled>
+                            </div>
+                        </div>
+
+                        <div class="help" id="skidHelp">Enter BOL to load skids.</div>
+                    </div>
+                </div>
+
+                <div class="toolbar" style="margin-top: 12px;">
+                    <button class="btn btn-secondary" id="resetBtn" type="button">Reset</button>
+                </div>
+
+                <div id="statusMsg" class="alert alert-info hidden" style="margin-top: 12px;"></div>
+                <div id="errorMsg" class="alert alert-danger hidden" style="margin-top: 12px;"></div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Labels (Editable)</div>
+
+                <div class="table-wrap">
+                    <table class="data-table" id="labelsTable">
+                        <thead>
+                            <tr>
+                                <th style="min-width:160px;">FBPN</th>
+                                <th style="min-width:110px;">QTY</th>
+                                <th style="min-width:210px;">PROJECT</th>
+                                <th style="min-width:210px;">SKU</th>
+                                <th style="min-width:220px;">Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="labelsTbody">
+                            <tr>
+                                <td colspan="5" class="muted">No data loaded.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="section-footer">
+                    <button class="btn btn-primary" id="saveBtn" type="button" disabled>Save Edits</button>
+                </div>
+
+                <div id="saveLinks" class="alert alert-success hidden" style="margin-top:12px;">
+                    <div style="font-weight:700; margin-bottom:8px;">Labels regenerated</div>
+                    <div><a id="singlePdfLink" href="#" target="_blank" rel="noopener">Open single edited label PDF</a>
+                    </div>
+                    <div style="margin-top:6px;"><a id="combinedPdfLink" href="#" target="_blank" rel="noopener">Open
+                            combined labels PDF</a></div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Context</div>
+                <div class="grid2">
+                    <div class="form-group">
+                        <label class="form-label">Manufacturer</label>
+                        <input id="ctxManufacturer" class="form-input" type="text" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Push #</label>
+                        <input id="ctxPush" class="form-input" type="text" disabled>
+                    </div>
+                </div>
+                <div class="grid2">
+                    <div class="form-group">
+                        <label class="form-label">Total Skids</label>
+                        <input id="ctxTotalSkids" class="form-input" type="text" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">BOL</label>
+                        <input id="ctxBol" class="form-input" type="text" disabled>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const $ = (id) => document.getElementById(id);
+
+        let _bolDebounce = null;
+        let _skidDebounce = null;
+        let _skidsForBol = [];
+        let _current = null;
+        let _originalLabels = [];
+        let _lastLoadedKey = '';
+
+        function showLoading(on, msg) {
+            const el = $('loading');
+            const txt = $('loadingText');
+            if (msg) txt.textContent = msg;
+            el.classList.toggle('active', !!on);
+        }
+        function showInfo(msg) {
+            $('statusMsg').textContent = msg || '';
+            $('statusMsg').classList.toggle('hidden', !msg);
+        }
+        function showError(msg) {
+            $('errorMsg').textContent = msg || '';
+            $('errorMsg').classList.toggle('hidden', !msg);
+        }
+        function normalize(v) { return String(v || '').trim(); }
+
+        function setSkidLoading(isLoading, msg) {
+            $('skidHelp').textContent = msg || (isLoading ? 'Loading skids…' : '');
+            $('skidSelect').disabled = !!isLoading;
+            $('skidInput').disabled = !!isLoading;
+        }
+
+        function renderSkidDropdown(skids) {
+            const sel = $('skidSelect');
+            sel.innerHTML = '<option value="">Select Skid…</option>';
+            (skids || []).forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s;
+                opt.textContent = s;
+                sel.appendChild(opt);
+            });
+        }
+
+        function showSaveLinks(singleUrl, combinedUrl) {
+            const box = $('saveLinks');
+            const a1 = $('singlePdfLink');
+            const a2 = $('combinedPdfLink');
+
+            if (singleUrl) { a1.href = singleUrl; a1.classList.remove('hidden'); }
+            else { a1.href = '#'; a1.classList.add('hidden'); }
+
+            if (combinedUrl) { a2.href = combinedUrl; a2.classList.remove('hidden'); }
+            else { a2.href = '#'; a2.classList.add('hidden'); }
+
+            box.classList.toggle('hidden', !(singleUrl || combinedUrl));
+        }
+
+        function clearOutputs() {
+            $('ctxManufacturer').value = '';
+            $('ctxPush').value = '';
+            $('ctxTotalSkids').value = '';
+            $('ctxBol').value = '';
+            $('metaCount').textContent = '0 labels';
+            $('saveBtn').disabled = true;
+            $('labelsTbody').innerHTML = `<tr><td colspan="5" class="muted">No data loaded.</td></tr>`;
+            showSaveLinks('', '');
+        }
+
+        function resetSkidControls() {
+            $('skidSelect').value = '';
+            $('skidInput').value = '';
+            renderSkidDropdown([]);
+            $('skidSelect').disabled = true;
+            $('skidInput').disabled = true;
+            $('skidHelp').textContent = 'Enter BOL to load skids.';
+        }
+
+        function onBolChanged() {
+            const bol = normalize($('bolInput').value);
+
+            _skidsForBol = [];
+            _current = null;
+            _originalLabels = [];
+            _lastLoadedKey = '';
+
+            resetSkidControls();
+            clearOutputs();
+            showInfo('');
+            showError('');
+
+            if (!bol) return;
+
+            setSkidLoading(true, 'Loading skids…');
+
+            google.script.run
+                .withSuccessHandler((res) => {
+                    const skids = (res && res.skidIds) ? res.skidIds : (Array.isArray(res) ? res : []);
+                    _skidsForBol = (skids || []).filter(Boolean).map(s => String(s).trim()).filter(Boolean);
+
+                    renderSkidDropdown(_skidsForBol);
+
+                    if (!_skidsForBol.length) {
+                        setSkidLoading(false, 'No skids found for this BOL.');
+                        showError('No skid IDs were found in the latest Labels HTML for this BOL.');
+                        return;
+                    }
+
+                    $('skidSelect').disabled = false;
+                    $('skidInput').disabled = false;
+                    $('skidHelp').textContent = `Loaded ${_skidsForBol.length} skid(s). Pick from drop-down or type a skid ID.`;
+                    showInfo('Skids loaded for BOL.');
+                    setSkidLoading(false, $('skidHelp').textContent);
+                })
+                .withFailureHandler((err) => {
+                    setSkidLoading(false, 'Failed to load skids for this BOL.');
+                    showError('Skid load failed: ' + (err && err.message ? err.message : err));
+                    console.error(err);
+                })
+                .shell_labelEditor_listSkidsForBol(bol);
+        }
+
+        function escapeAttr(s) {
+            return String(s || '')
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        function buildEditableRow(d, i) {
+            const fbpn = normalize(d.fbpn);
+            const qty = normalize(d.quantity);
+            const project = normalize(d.project);
+            const sku = normalize(d.sku);
+
+            return `
+          <tr data-i="${i}">
+            <td><input class="form-input" type="text" value="${escapeAttr(fbpn)}" data-k="fbpn"></td>
+            <td><input class="form-input" type="number" step="any" value="${escapeAttr(qty)}" data-k="quantity"></td>
+            <td><input class="form-input" type="text" value="${escapeAttr(project)}" data-k="project"></td>
+            <td><input class="form-input" type="text" value="${escapeAttr(sku)}" data-k="sku"></td>
+            <td><input class="form-input" type="text" value="" data-k="notes" placeholder="(optional)"></td>
+          </tr>
+        `;
+        }
+
+        function renderLabels(labels) {
+            const body = $('labelsTbody');
+            if (!labels || !labels.length) {
+                body.innerHTML = `<tr><td colspan="5" class="muted">No labels found for this skid.</td></tr>`;
+                return;
+            }
+            body.innerHTML = labels.map((d, i) => buildEditableRow(d, i)).join('');
+        }
+
+        function readEdits() {
+            const rows = Array.from($('labelsTbody').querySelectorAll('tr[data-i]'));
+            return rows.map(tr => {
+                const i = Number(tr.getAttribute('data-i'));
+                const base = (_current && _current.labels && _current.labels[i]) ? _current.labels[i] : {};
+                const inputs = Array.from(tr.querySelectorAll('input[data-k]'));
+                const out = Object.assign({}, base);
+
+                inputs.forEach(inp => {
+                    const k = inp.getAttribute('data-k');
+                    if (!k) return;
+                    out[k] = inp.value;
+                });
+
+                out.skidId = base.skidId || (_current ? _current.skidId : '');
+                out.manufacturer = base.manufacturer || (_current && _current.meta ? _current.meta.manufacturer : '');
+                out.pushNumber = base.pushNumber || (_current && _current.meta ? _current.meta.pushNumber : '');
+                out.totalSkids = base.totalSkids || (_current && _current.meta ? _current.meta.totalSkids : '');
+
+                return out;
+            });
+        }
+
+        function loadLabels() {
+            showInfo('');
+            showError('');
+            showSaveLinks('', '');
+
+            const bol = normalize($('bolInput').value);
+            const skid = normalize($('skidInput').value);
+            if (!bol) return showError('Enter BOL Number.');
+            if (!skid) return;
+
+            const key = bol + '|' + skid;
+            if (key === _lastLoadedKey) return;
+            _lastLoadedKey = key;
+
+            showLoading(true, 'Loading labels…');
+
+            google.script.run
+                .withSuccessHandler((res) => {
+                    showLoading(false);
+                    _current = res;
+
+                    if (!res || !res.success) {
+                        _lastLoadedKey = '';
+                        clearOutputs();
+                        showError((res && res.message) ? res.message : 'Load failed.');
+                        return;
+                    }
+
+                    _originalLabels = JSON.parse(JSON.stringify(res.labels || []));
+                    $('metaCount').textContent = `${(res.labels || []).length} labels`;
+
+                    $('ctxManufacturer').value = (res.meta && res.meta.manufacturer) ? res.meta.manufacturer : '';
+                    $('ctxPush').value = (res.meta && res.meta.pushNumber) ? res.meta.pushNumber : '';
+                    $('ctxTotalSkids').value = (res.meta && res.meta.totalSkids) ? res.meta.totalSkids : '';
+                    $('ctxBol').value = res.bol || bol;
+
+                    renderLabels(res.labels || []);
+                    $('saveBtn').disabled = !(res.labels && res.labels.length);
+
+                    showInfo('Labels loaded.');
+                })
+                .withFailureHandler((err) => {
+                    showLoading(false);
+                    _lastLoadedKey = '';
+                    clearOutputs();
+                    showError('Load failed: ' + (err && err.message ? err.message : err));
+                    console.error(err);
+                })
+                .shell_labelEditor_find(bol, skid);
+        }
+
+        function saveEdits() {
+            if (!_current || !_current.success) return showError('Load labels first.');
+
+            const bol = normalize($('bolInput').value);
+            const skid = normalize($('skidInput').value);
+
+            const edits = readEdits();
+            if (!edits.length) return showError('No edits to save.');
+
+            showLoading(true, 'Saving…');
+            showSaveLinks('', '');
+
+            const payload = {
+                bol: bol,
+                skidId: skid,
+                folderId: _current.folderId,
+                sourceHtmlFileId: _current.sourceHtmlFileId,
+                sourcePdfFileId: _current.sourcePdfFileId || '',
+                labels: edits,
+                originalLabels: _originalLabels
+            };
+
+            google.script.run
+                .withSuccessHandler((res) => {
+                    showLoading(false);
+                    if (!res || !res.success) {
+                        showError((res && res.message) ? res.message : 'Save failed.');
+                        return;
+                    }
+
+                    showSaveLinks(res.singleLabelPdfUrl, res.combinedPdfUrl);
+                    showInfo('Saved. Use the links below to print.');
+                })
+                .withFailureHandler((err) => {
+                    showLoading(false);
+                    showError('Save failed: ' + (err && err.message ? err.message : err));
+                    console.error(err);
+                })
+                .shell_labelEditor_save(payload);
+        }
+
+        function resetAll() {
+            $('bolInput').value = '';
+            _skidsForBol = [];
+            _current = null;
+            _originalLabels = [];
+            _lastLoadedKey = '';
+            resetSkidControls();
+            clearOutputs();
+            showInfo('');
+            showError('');
+        }
+
+        function tryAutoLoadFromSkidTyping() {
+            clearTimeout(_skidDebounce);
+            _skidDebounce = setTimeout(() => {
+                const skid = normalize($('skidInput').value);
+                if (!skid) return;
+
+                const exact = _skidsForBol.find(s => String(s).trim() === skid);
+                if (exact) $('skidSelect').value = exact;
+
+                loadLabels();
+            }, 220);
+        }
+
+        $('bolInput').addEventListener('input', () => {
+            clearTimeout(_bolDebounce);
+            _bolDebounce = setTimeout(onBolChanged, 350);
+        });
+
+        $('skidSelect').addEventListener('change', () => {
+            const v = normalize($('skidSelect').value);
+            $('skidInput').value = v;
+            if (v) loadLabels();
+        });
+
+        $('skidInput').addEventListener('input', tryAutoLoadFromSkidTyping);
+        $('skidInput').addEventListener('blur', () => {
+            const skid = normalize($('skidInput').value);
+            if (!skid) return;
+            const exact = _skidsForBol.find(s => String(s).trim() === skid);
+            if (exact) $('skidSelect').value = exact;
+            loadLabels();
+        });
+
+        $('saveBtn').addEventListener('click', saveEdits);
+        $('resetBtn').addEventListener('click', resetAll);
+
+        resetAll();
+    </script>
+</body>
+
+</html>

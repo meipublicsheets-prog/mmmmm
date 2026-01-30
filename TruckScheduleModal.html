@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include('UniversalStyles'); ?>
+  <script>
+    // Form data
+    let formData = {
+      deliveryDate: '',
+      time: '',
+      carrier: '',
+      bolNumber: '',
+      po: '',
+      project: '',
+      totalSkids: '',
+      fbpn: '',
+      totalQty: '',
+      notes: '',
+      bolPackingList: ''
+    };
+
+    // =========================================================================
+    // FORM VALIDATION AND SUBMISSION
+    // =========================================================================
+
+    function validateForm() {
+      const required = ['deliveryDate', 'time', 'carrier', 'project'];
+      let isValid = true;
+
+      required.forEach(field => {
+        const input = document.getElementById(field);
+        if (!input.value) {
+          input.style.borderColor = '#ef4444';
+          isValid = false;
+        } else {
+          input.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+        }
+      });
+
+      if (!isValid) {
+        showAlert('Please fill in all required fields', 'danger');
+      }
+
+      return isValid;
+    }
+
+    function collectFormData() {
+      formData = {
+        deliveryDate: document.getElementById('deliveryDate').value,
+        time: document.getElementById('time').value,
+        carrier: document.getElementById('carrier').value,
+        bolNumber: document.getElementById('bolNumber').value,
+        po: document.getElementById('po').value,
+        project: document.getElementById('project').value,
+        totalSkids: document.getElementById('totalSkids').value,
+        fbpn: document.getElementById('fbpn').value,
+        totalQty: document.getElementById('totalQty').value,
+        notes: document.getElementById('notes').value,
+        bolPackingList: document.getElementById('bolPackingList').value
+      };
+
+      return formData;
+    }
+
+    function submitSchedule() {
+      if (!validateForm()) return;
+
+      const data = collectFormData();
+
+      document.getElementById('submitBtn').disabled = true;
+      document.getElementById('submitBtn').innerHTML = '<span>Processing...</span>';
+
+      google.script.run
+        .withSuccessHandler(handleSuccess)
+        .withFailureHandler(handleError)
+        .scheduleTruckDelivery(data);
+    }
+
+    function handleSuccess(result) {
+      showAlert('Truck delivery scheduled successfully!', 'success');
+      setTimeout(() => {
+        resetForm();
+        google.script.host.close();
+      }, 2000);
+    }
+
+    function handleError(error) {
+      showAlert('Error scheduling delivery: ' + error.message, 'danger');
+      document.getElementById('submitBtn').disabled = false;
+      document.getElementById('submitBtn').innerHTML = 'Schedule Delivery';
+    }
+
+    function resetForm() {
+      document.getElementById('scheduleForm').reset();
+      document.getElementById('submitBtn').disabled = false;
+      document.getElementById('submitBtn').innerHTML = 'Schedule Delivery';
+    }
+
+    function showAlert(message, type) {
+      const alertDiv = document.getElementById('alertContainer');
+      const alertClass = type === 'success' ? 'alert-success' : type === 'danger' ? 'alert-danger' : 'alert-info';
+
+      alertDiv.innerHTML = `
+        <div class="alert ${alertClass}">
+          ${type === 'success' ? '✓' : type === 'danger' ? '⚠' : 'ℹ'} ${message}
+        </div>
+      `;
+
+      setTimeout(() => {
+        alertDiv.innerHTML = '';
+      }, 5000);
+    }
+
+    // Set today's date as default
+    document.addEventListener('DOMContentLoaded', function() {
+      const today = new Date().toISOString().split('T')[0];
+      const dateInput = document.getElementById('deliveryDate');
+      if (dateInput) {
+        dateInput.value = today;
+      }
+    });
+  </script>
+</head>
+<body>
+  <div class="modal-container">
+    <!-- Header -->
+    <div class="modal-header">
+      <h1>Schedule Truck Delivery</h1>
+      <p>Schedule and track inbound truck deliveries</p>
+    </div>
+
+    <!-- Alert Container -->
+    <div id="alertContainer"></div>
+
+    <!-- Form Content -->
+    <form id="scheduleForm" class="tab-content active">
+      <!-- Delivery Information -->
+      <div class="form-section">
+        <h3 class="form-section-title">Delivery Information</h3>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label required">Delivery Date</label>
+            <input type="date" class="form-input" id="deliveryDate" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label required">Time</label>
+            <input type="time" class="form-input" id="time" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label required">Carrier</label>
+            <input type="text" class="form-input" id="carrier" placeholder="e.g., UPS, FedEx, XPO" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">BOL Number</label>
+            <input type="text" class="form-input" id="bolNumber" placeholder="Bill of Lading number">
+          </div>
+        </div>
+      </div>
+
+      <!-- Shipment Details -->
+      <div class="form-section">
+        <h3 class="form-section-title">Shipment Details</h3>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">PO Number</label>
+            <input type="text" class="form-input" id="po" placeholder="Purchase Order number">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label required">Project</label>
+            <input type="text" class="form-input" id="project" placeholder="Project name" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Total Skids</label>
+            <input type="number" class="form-input" id="totalSkids" placeholder="Number of skids" min="0">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">FBPN</label>
+            <input type="text" class="form-input" id="fbpn" placeholder="Item FBPN">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Total Quantity</label>
+            <input type="number" class="form-input" id="totalQty" placeholder="Total quantity" min="0">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">BOL/Packing List</label>
+            <input type="text" class="form-input" id="bolPackingList" placeholder="Document reference">
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="form-section">
+        <div class="form-group">
+          <label class="form-label">Notes</label>
+          <textarea class="form-textarea" id="notes" rows="4" placeholder="Additional notes or special instructions..."></textarea>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="button-group">
+        <button type="button" class="btn btn-secondary" onclick="resetForm()">
+          Clear Form
+        </button>
+        <button type="button" class="btn btn-success" id="submitBtn" onclick="submitSchedule()">
+          Schedule Delivery
+        </button>
+      </div>
+    </form>
+  </div>
+</body>
+</html>

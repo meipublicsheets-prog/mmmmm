@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include('UniversalStyles'); ?>
+  <style>
+    /* MODAL-SPECIFIC STYLES */
+    
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .form-grid.three-col {
+      grid-template-columns: repeat(3, 1fr);
+    }
+    
+    /* Transaction Card (Undo Tab) */
+    .txn-card {
+      background: white;
+      border: 1px solid var(--border-color, #e5e7eb);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.2s ease;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    
+    .txn-card:hover {
+      border-color: var(--primary);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }
+    
+    .txn-info h4 {
+      margin: 0 0 6px 0;
+      color: var(--text-main);
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    
+    .txn-meta {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+    
+    .txn-meta span {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    
+    /* Search Box */
+    .search-box {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      padding: 20px;
+      background: #f9fafb;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+    }
+    
+    /* History Table Container */
+    .table-container {
+      max-height: 450px;
+      overflow-y: auto;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+    }
+    
+    /* Status Badge */
+    .badge-txn {
+      font-family: 'Consolas', monospace;
+      background: #eef2ff;
+      color: #4f46e5;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      border: 1px solid #c7d2fe;
+    }
+
+  </style>
+  <script>
+    // Tab Navigation Logic
+    function showTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
+      
+      document.getElementById(tabId).classList.add('active');
+      // Find button by onclick attribute text match
+      const btn = Array.from(document.querySelectorAll('.tab-button'))
+                       .find(b => b.getAttribute('onclick').includes(tabId));
+      if(btn) btn.classList.add('active');
+    }
+
+    // ========================================================================
+    // TAB 1: UNDO / DELETE
+    // ========================================================================
+
+    function searchBOL() {
+      const bol = document.getElementById('bolSearchInput').value.trim();
+      if (!bol) return showAlert('Please enter a BOL number to search.', 'warning');
+
+      showLoading(true, 'Searching transactions...');
+      
+      google.script.run
+        .withSuccessHandler(renderSearchResults)
+        .withFailureHandler(handleError)
+        .searchInboundByBOL(bol);
+    }
+
+    function renderSearchResults(results) {
+      showLoading(false);
+      const container = document.getElementById('searchResults');
+      container.innerHTML = '';
+
+      if (!results || results.length === 0) {
+        container.innerHTML = `
+          <div class="alert alert-warning">
+            <strong>No results found.</strong><br>
+            Ensure the BOL number matches exactly what was entered in the Master Log.
+          </div>`;
+        return;
+      }
+
+      results.forEach(txn => {
+        const div = document.createElement('div');
+        div.className = 'txn-card';
+        div.innerHTML = `
+          <div class="txn-info">
+            <h4>Transaction: <span class="badge-txn">${txn.txnId}</span></h4>
+            <div class="txn-meta">
+              <span title="Date Received">📅 ${txn.date}</span>
+              <span title="Manufacturer">🏭 ${txn.manufacturer}</span>
+              <span title="Total Skids">📦 ${txn.totalSkids} Skids</span>
+            </div>
+          </div>
+          <button class="btn btn-danger btn-small" onclick="confirmUndo('${txn.txnId}')">
+            🗑️ Undo / Delete
+          </button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function confirmUndo(txnId) {
+      const msg = `⚠️ DANGER ZONE ⚠️\n\nAre you sure you want to PERMANENTLY delete transaction ${txnId}?\n\n` + 
+                  `This will:\n1. Remove entries from Master Log\n2. Delete associated Inbound Skids\n3. Remove items from Inbound Staging\n\n` +
+                  `This action cannot be undone.`;
+                  
+      if (confirm(msg)) {
+        showLoading(true, 'Reverting Transaction...');
+        google.script.run
+          .withSuccessHandler((res) => {
+            showLoading(false);
+            if(res.success) {
+              showAlert(res.message, 'success');
+              document.getElementById('searchResults').innerHTML = ''; // Clear results
+              document.getElementById('bolSearchInput').value = '';
+            } else {
+              showAlert('Error: ' + res.message, 'danger');
+            }
+          })
+          .withFailureHandler(handleError)
+          .executeUndoByTxnId(txnId);
+      }
+    }
+
+    // ========================================================================
+    // TAB 2: LABEL HISTORY (Reprint)
+    // ========================================================================
+
+    function loadHistory() {
+      showLoading(true, 'Loading history...');
+      google.script.run
+        .withSuccessHandler(renderHistory)
+        .withFailureHandler(handleError)
+        .getRecentInboundTransactions(50);
+    }
+
+    function searchHistoryBOL() {
+      const bol = document.getElementById('historyBolSearch').value.trim();
+      if (!bol) return showAlert('Please enter a BOL number.', 'warning');
+
+      showLoading(true, 'Searching for labels...');
+      
+      google.script.run
+        .withSuccessHandler((results) => {
+           // Map results to match renderHistory format (add 'bol' property as it is implicit in search)
+           const mapped = results.map(r => ({
+             ...r,
+             bol: bol 
+           }));
+           renderHistory(mapped);
+        })
+        .withFailureHandler(handleError)
+        .searchInboundByBOL(bol);
+    }
+
+    function renderHistory(txns) {
+      showLoading(false);
+      const tbody = document.getElementById('historyBody');
+      tbody.innerHTML = '';
+
+      if(!txns || txns.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">No transactions found.</td></tr>';
+        return;
+      }
+
+      txns.forEach(txn => {
+        const row = tbody.insertRow();
+        row.innerHTML = `
+          <td>${txn.date}</td>
+          <td><span style="font-weight:600;">${txn.bol || '-'}</span></td>
+          <td>${txn.manufacturer}</td>
+          <td><span class="badge-txn" style="font-size:0.75rem;">${txn.txnId}</span></td>
+          <td style="text-align:right">
+            <button class="btn btn-secondary btn-small" onclick="reprintLabels('${txn.txnId}')" title="Reprint All Labels">
+              🖨️ PDF
+            </button>
+            <button class="btn btn-primary btn-small" onclick="createNewLabels('${txn.txnId}')" title="Create New Labels if Missing">
+              ➕ Create New
+            </button>
+          </td>
+        `;
+      });
+    }
+
+    function reprintLabels(txnId) {
+      showLoading(true, 'Generating PDF...');
+      google.script.run
+        .withSuccessHandler(handleLabelResult)
+        .withFailureHandler(handleError)
+        .regenerateLabelsForTxn(txnId);
+    }
+
+    function createNewLabels(txnId) {
+        if(confirm("This will generate fresh labels based on the logged data for transaction " + txnId + ". Continue?")) {
+            showLoading(true, 'Creating Labels...');
+            google.script.run
+            .withSuccessHandler(handleLabelResult)
+            .withFailureHandler(handleError)
+            .regenerateLabelsForTxn(txnId); // Reuse logic as it fetches fresh data
+        }
+    }
+
+    // ========================================================================
+    // TAB 3: MANUAL LABEL
+    // ========================================================================
+
+    function generateManual() {
+      const data = {
+        fbpn: document.getElementById('man_fbpn').value.trim(),
+        qty: document.getElementById('man_qty').value,
+        manufacturer: document.getElementById('man_mfg').value.trim(),
+        project: document.getElementById('man_proj').value.trim(),
+        push: document.getElementById('man_push').value.trim(),
+        bol: document.getElementById('man_bol').value.trim(),
+        copies: document.getElementById('man_copies').value
+      };
+
+      if (!data.fbpn || !data.qty) {
+        return showAlert('FBPN and Quantity are required.', 'warning');
+      }
+
+      // Validating Manufacturer to prevent barcode generation errors
+      if (!data.manufacturer) {
+        return showAlert('Manufacturer is required to generate the SKU barcode.', 'warning');
+      }
+
+      showLoading(true, 'Creating Manual Labels...');
+      google.script.run
+        .withSuccessHandler(handleLabelResult)
+        .withFailureHandler(handleError)
+        .generateManualLabel(data);
+    }
+
+    // ========================================================================
+    // UTILITIES
+    // ========================================================================
+
+    function handleLabelResult(res) {
+      showLoading(false);
+      if (res.success) {
+        // Open PDF
+        if (res.pdfUrl) {
+          window.open(res.pdfUrl, '_blank');
+        } else if (res.htmlUrl) {
+          window.open(res.htmlUrl, '_blank');
+        }
+        showAlert('Labels generated successfully! Check your popup blocker if tab did not open.', 'success');
+      } else {
+        showAlert('Error: ' + res.message, 'danger');
+      }
+    }
+
+    function handleError(err) {
+      showLoading(false);
+      showAlert('System Error: ' + err.message, 'danger');
+    }
+
+    function showAlert(msg, type) {
+      const container = document.getElementById('alertArea');
+      const div = document.createElement('div');
+      div.className = `alert alert-${type}`;
+      div.innerText = msg;
+      
+      container.innerHTML = ''; // Clear previous
+      container.appendChild(div);
+      container.style.display = 'block';
+      
+      // Auto hide after 5s
+      setTimeout(() => {
+        container.style.display = 'none';
+      }, 5000);
+    }
+
+    function showLoading(show, txt) {
+      const el = document.getElementById('loadingOverlay');
+      if (show) {
+        document.getElementById('loadingText').innerText = txt || 'Processing...';
+        el.classList.add('active');
+      } else {
+        el.classList.remove('active');
+      }
+    }
+
+    // Tab Switch Listener to load data
+    function onTabClick(tabId) {
+      showTab(tabId);
+      if (tabId === 'tabHistory') {
+        // Only load if table is empty
+        const tbody = document.getElementById('historyBody');
+        if (tbody && tbody.children.length === 0) {
+          loadHistory();
+        }
+      }
+    }
+    
+    // Init
+    window.onload = function() {
+      // Default to first tab
+      showTab('tabUndo');
+    };
+  </script>
+</head>
+<body>
+  <div class="modal-container">
+    <div class="modal-header">
+      <h1>Inbound Manager</h1>
+      <p>Manage submissions, undo transactions, and print labels</p>
+    </div>
+
+    <!-- TABS -->
+    <div class="tab-navigation">
+      <button class="tab-button active" onclick="onTabClick('tabUndo')">Undo / Delete</button>
+      <button class="tab-button" onclick="onTabClick('tabHistory')">Past Deliveries (Reprint)</button>
+      <button class="tab-button" onclick="onTabClick('tabManual')">Manual Label</button>
+    </div>
+
+    <!-- ALERTS -->
+    <div id="alertArea" style="display:none; padding: 15px 15px 0 15px;"></div>
+
+    <!-- TAB 1: UNDO -->
+    <div id="tabUndo" class="tab-content active">
+      <div class="form-section">
+        <h3 class="form-section-title">Find Transaction by BOL</h3>
+        <div class="search-box">
+          <input type="text" id="bolSearchInput" class="form-input" placeholder="Enter BOL Number (e.g. 12345678)" style="flex:1;">
+          <button class="btn btn-primary" onclick="searchBOL()">Search</button>
+        </div>
+        <div id="searchResults"></div>
+      </div>
+    </div>
+
+    <!-- TAB 2: HISTORY / SEARCH -->
+    <div id="tabHistory" class="tab-content">
+      <div class="form-section">
+        <h3 class="form-section-title">Search & Reprint Labels</h3>
+        
+        <div class="search-box" style="margin-bottom: 15px; padding: 10px;">
+          <input type="text" id="historyBolSearch" class="form-input" placeholder="Search by BOL Number..." style="flex:1;">
+          <button class="btn btn-primary" onclick="searchHistoryBOL()">Search BOL</button>
+          <button class="btn btn-secondary" onclick="loadHistory()">Show Recent</button>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:15%">Date</th>
+                <th style="width:20%">BOL</th>
+                <th style="width:25%">Manufacturer</th>
+                <th style="width:20%">Txn ID</th>
+                <th style="width:20%; text-align:right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody">
+              <!-- Loaded dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: MANUAL LABEL -->
+    <div id="tabManual" class="tab-content">
+      <div class="form-section">
+        <h3 class="form-section-title">Generate Custom Label</h3>
+        <div class="alert alert-info" style="margin-bottom:20px;">
+          This creates a standalone 6x4 PDF label. It does <strong>not</strong> log data to the system.
+        </div>
+        
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label required">FBPN</label>
+            <input type="text" id="man_fbpn" class="form-input" placeholder="e.g. 23-101499">
+          </div>
+          <div class="form-group">
+            <label class="form-label required">Quantity</label>
+            <input type="number" id="man_qty" class="form-input" placeholder="e.g. 50">
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label required">Manufacturer</label>
+            <input type="text" id="man_mfg" class="form-input" placeholder="e.g. AMPHENOL">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Project</label>
+            <input type="text" id="man_proj" class="form-input" placeholder="e.g. NLH 2">
+          </div>
+        </div>
+
+        <div class="form-grid three-col">
+          <div class="form-group">
+            <label class="form-label">Push #</label>
+            <input type="text" id="man_push" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">BOL # (Optional)</label>
+            <input type="text" id="man_bol" class="form-input" placeholder="MANUAL">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Copies</label>
+            <input type="number" id="man_copies" class="form-input" value="1" min="1" max="20">
+          </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 20px;">
+          <button class="btn btn-success" onclick="generateManual()">
+            🖨️ Generate PDF Label
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- LOADING -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <div id="loadingText" class="loading-text">Processing...</div>
+  </div>
+</body>
+</html>

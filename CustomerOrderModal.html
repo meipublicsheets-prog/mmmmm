@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <?!= include('UniversalStyles'); ?>
+  <style>
+    /* Local Overrides matching Professional Dark Theme */
+    .paste-area {
+      width: 100%;
+      min-height: 200px;
+      background: var(--bg-body);
+      border: 2px dashed var(--primary);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      color: var(--text-main);
+      resize: vertical;
+      transition: all 0.2s ease;
+    }
+
+    .paste-area:focus {
+      outline: none;
+      border-color: var(--primary-hover);
+      background: var(--bg-body);
+      box-shadow: 0 0 0 3px var(--primary-light);
+    }
+
+    .paste-instructions {
+      background: var(--primary-light);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+      color: var(--primary);
+    }
+
+    .parsed-preview {
+      margin-top: 20px;
+      background: var(--bg-body);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 0;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .item-count-bar {
+      padding: 12px 16px;
+      background: var(--bg-element);
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .preview-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .preview-table th {
+      background: var(--bg-element);
+      padding: 10px 16px;
+      text-align: left;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border-color);
+      position: sticky;
+      top: 0;
+    }
+
+    .preview-table td {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-main);
+    }
+
+    .preview-table tr:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+  </style>
+  <script>
+    let parsedItems = [];
+    let fileToUpload = null;
+
+    // =========================================================================
+    // PAGE LOAD
+    // =========================================================================
+
+    window.onload = function () {
+      // Set today's date as default NBD
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('nbdDate').value = today;
+
+      // Load dropdown data
+      loadCompanies();
+      loadProjects();
+    };
+
+    function loadCompanies() {
+      google.script.run
+        .withSuccessHandler(function (companies) {
+          const select = document.getElementById('company');
+
+          // Add requested extra companies manually
+          const extras = ['IBOS', 'Turner', 'DirectLine'];
+          // Merge with backend data, remove duplicates, and sort
+          const allCompanies = Array.from(new Set([...companies, ...extras])).sort();
+
+          allCompanies.forEach(company => {
+            const option = document.createElement('option');
+            option.value = company;
+            option.textContent = company;
+            select.appendChild(option);
+          });
+        })
+        .withFailureHandler(function (error) {
+          console.error('Error loading companies:', error);
+          // Fallback if server fails (optional, good UX)
+          const select = document.getElementById('company');
+          ['IBOS', 'Turner', 'DirectLine'].forEach(company => {
+            const option = document.createElement('option');
+            option.value = company;
+            option.textContent = company;
+            select.appendChild(option);
+          });
+        })
+        .getCompanies();
+    }
+
+    function loadProjects() {
+      google.script.run
+        .withSuccessHandler(function (projects) {
+          const select = document.getElementById('project');
+
+          // Add requested extra projects manually
+          const extras = ['LCO 1', 'LCO 2'];
+          // Merge with backend data, remove duplicates, and sort
+          const allProjects = Array.from(new Set([...projects, ...extras])).sort();
+
+          allProjects.forEach(project => {
+            const option = document.createElement('option');
+            option.value = project;
+            option.textContent = project;
+            select.appendChild(option);
+          });
+        })
+        .withFailureHandler(function (error) {
+          console.error('Error loading projects:', error);
+          // Fallback
+          const select = document.getElementById('project');
+          ['LCO 1', 'LCO 2'].forEach(project => {
+            const option = document.createElement('option');
+            option.value = project;
+            option.textContent = project;
+            select.appendChild(option);
+          });
+        })
+        .getProjects();
+    }
+
+    // =========================================================================
+    // EXCEL PASTE PARSING
+    // =========================================================================
+
+    function parsePastedData() {
+      const pasteArea = document.getElementById('pasteArea');
+      const text = pasteArea.value.trim();
+
+      if (!text) {
+        showAlert('Please paste data from Excel first', 'warning');
+        return;
+      }
+
+      // Split by lines
+      const lines = text.split('\n').filter(line => line.trim());
+
+      if (lines.length === 0) {
+        showAlert('No data to parse', 'warning');
+        return;
+      }
+
+      // Parse each line (assuming tab-separated)
+      parsedItems = [];
+
+      lines.forEach((line, index) => {
+        // Split by tabs
+        const columns = line.split('\t').map(col => col.trim());
+
+        // Check if this might be a header row
+        if (index === 0 && (columns[0].toLowerCase().includes('fbpn') || columns[0].toLowerCase().includes('part'))) {
+          return; // Skip header row
+        }
+
+        // Extract FBPN, Description, and Quantity (3 columns)
+        if (columns.length >= 3) {
+          const fbpn = columns[0].trim();
+          const description = columns[1].trim();
+          const qty = parseInt(columns[2]) || 0;
+
+          if (fbpn && qty > 0) {
+            parsedItems.push({
+              fbpn: fbpn,
+              description: description,
+              qty: qty
+            });
+          }
+        }
+      });
+
+      if (parsedItems.length === 0) {
+        showAlert('No valid items found. Make sure data has FBPN, Description, and Qty columns.', 'danger');
+        return;
+      }
+
+      displayParsedPreview();
+      showAlert(`Successfully parsed ${parsedItems.length} items!`, 'success');
+    }
+
+    function displayParsedPreview() {
+      const previewDiv = document.getElementById('parsedPreview');
+      const itemCountSpan = document.getElementById('itemCount');
+      const tableBody = document.getElementById('previewTableBody');
+
+      previewDiv.style.display = 'block';
+      itemCountSpan.textContent = parsedItems.length;
+
+      // Build table
+      tableBody.innerHTML = '';
+      parsedItems.forEach((item, index) => {
+        const row = tableBody.insertRow();
+        row.innerHTML = `
+          <td>${index + 1}</td>
+          <td><strong>${item.fbpn}</strong></td>
+          <td>${item.description || ''}</td>
+          <td>${item.qty}</td>
+        `;
+      });
+    }
+
+    // =========================================================================
+    // FILE UPLOAD
+    // =========================================================================
+
+    function handleFileUpload() {
+      const fileInput = document.getElementById('orderFile');
+      const fileDisplay = document.getElementById('fileDisplay');
+
+      if (fileInput.files.length > 0) {
+        fileToUpload = fileInput.files[0];
+        fileDisplay.innerHTML = '✓ ' + fileToUpload.name;
+        fileDisplay.style.color = 'var(--success)';
+      } else {
+        fileToUpload = null;
+        fileDisplay.textContent = '';
+      }
+    }
+
+    // =========================================================================
+    // FORM VALIDATION & SUBMISSION
+    // =========================================================================
+
+    function validateForm() {
+      const required = ['nbdDate', 'orderTitle', 'taskNumber', 'project', 'company', 'deliveryLocation'];
+      let isValid = true;
+
+      required.forEach(fieldId => {
+        const input = document.getElementById(fieldId);
+        if (!input.value.trim()) {
+          input.style.borderColor = 'var(--danger)';
+          isValid = false;
+        } else {
+          input.style.borderColor = 'var(--border-color)';
+        }
+      });
+
+      if (parsedItems.length === 0) {
+        showAlert('Please paste and parse order items before submitting', 'danger');
+        isValid = false;
+      }
+
+      return isValid;
+    }
+
+    function submitOrder() {
+      if (!validateForm()) {
+        return;
+      }
+
+      showLoading(true, 'Processing order...');
+
+      // Gather form data
+      const orderData = {
+        nbdDate: document.getElementById('nbdDate').value,
+        orderTitle: document.getElementById('orderTitle').value,
+        taskNumber: document.getElementById('taskNumber').value,
+        project: document.getElementById('project').value,
+        company: document.getElementById('company').value,
+        deliveryLocation: document.getElementById('deliveryLocation').value,
+        items: parsedItems
+      };
+
+      // Handle file upload if present
+      if (fileToUpload) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const base64Data = e.target.result.split(',')[1];
+          orderData.fileData = {
+            name: fileToUpload.name,
+            data: base64Data,
+            mimeType: fileToUpload.type
+          };
+
+          submitOrderToBackend(orderData);
+        };
+        reader.readAsDataURL(fileToUpload);
+      } else {
+        submitOrderToBackend(orderData);
+      }
+    }
+
+    function submitOrderToBackend(orderData) {
+      google.script.run
+        .withSuccessHandler(function (result) {
+          showLoading(false);
+
+          if (result.success) {
+            showAlert(`✓ Order ${result.orderId} created successfully!\n\n` +
+              `Total Items: ${result.totalItems}\n` +
+              `In Stock: ${result.inStockCount}\n` +
+              `Backordered: ${result.backorderedCount}`, 'success');
+
+            setTimeout(() => {
+              google.script.host.close();
+            }, 3000);
+          } else {
+            showAlert('Error: ' + result.message, 'danger');
+          }
+        })
+        .withFailureHandler(function (error) {
+          showLoading(false);
+          showAlert('Error submitting order: ' + error.message, 'danger');
+        })
+        .processCustomerOrder(orderData);
+    }
+
+    // =========================================================================
+    // UTILITY FUNCTIONS
+    // =========================================================================
+
+    function showAlert(message, type) {
+      const alertDiv = document.createElement('div');
+      alertDiv.className = `alert alert-${type}`;
+      alertDiv.style.whiteSpace = 'pre-line';
+      alertDiv.textContent = message;
+
+      const container = document.querySelector('.glass-container');
+      const header = container.querySelector('.header');
+      header.parentNode.insertBefore(alertDiv, header.nextSibling);
+
+      setTimeout(() => alertDiv.remove(), 5000);
+    }
+
+    function showLoading(show, message = 'Processing...') {
+      const overlay = document.getElementById('loadingOverlay');
+      const text = document.getElementById('loadingText');
+      if (text) text.textContent = message;
+
+      if (show) {
+        overlay.classList.add('active');
+      } else {
+        overlay.classList.remove('active');
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div class="glass-container">
+    <div class="header">
+      <h1>🛒 Create Customer Order</h1>
+      <p>Enter order details and paste items from Excel</p>
+    </div>
+
+    <div style="padding: 25px;">
+      <!-- Order Information -->
+      <div class="form-section">
+        <h2 class="form-section-title">Order Information</h2>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label required">Need By Date (NBD)</label>
+            <input type="date" id="nbdDate" class="form-input">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label required">Task Number</label>
+            <input type="text" id="taskNumber" class="form-input" placeholder="e.g., TSK-12345">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label required">Order Title</label>
+            <input type="text" id="orderTitle" class="form-input" placeholder="Brief description of order">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label required">Company</label>
+            <select id="company" class="form-select">
+              <option value="">Select Company</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label required">Project</label>
+            <select id="project" class="form-select">
+              <option value="">Select Project</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row full-width">
+          <div class="form-group">
+            <label class="form-label required">Delivery Location</label>
+            <input type="text" id="deliveryLocation" class="form-input"
+              placeholder="Enter delivery address or location">
+          </div>
+        </div>
+      </div>
+
+      <!-- Order Items -->
+      <div class="form-section">
+        <h2 class="form-section-title">Order Items</h2>
+
+        <div class="paste-instructions">
+          <strong>📋 Instructions:</strong> Copy the FBPN, Description, and Quantity columns from your Excel file and
+          paste them below.
+          Click "Parse Pasted Data" to process the items.
+        </div>
+
+        <div class="form-group">
+          <label class="form-label required">Paste Order Data from Excel</label>
+          <textarea id="pasteArea" class="paste-area"
+            placeholder="Paste FBPN, Description, and Quantity columns here (tab-separated)&#10;Example:&#10;FBPN123    Widget Assembly    50&#10;FBPN456    Control Module    100&#10;FBPN789    Power Supply    25"></textarea>
+        </div>
+
+        <button type="button" class="btn btn-primary mt-2" onclick="parsePastedData()">
+          📊 Parse Pasted Data
+        </button>
+
+        <!-- Parsed Preview -->
+        <div id="parsedPreview" class="parsed-preview" style="display: none;">
+          <div class="item-count-bar">📦 Parsed <span id="itemCount">0</span> items</div>
+          <table class="preview-table">
+            <thead>
+              <tr>
+                <th style="width: 50px;">#</th>
+                <th>FBPN</th>
+                <th>Description</th>
+                <th style="width: 100px;">Quantity</th>
+              </tr>
+            </thead>
+            <tbody id="previewTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- File Upload -->
+      <div class="form-section">
+        <h2 class="form-section-title">Original Order File (Optional)</h2>
+
+        <div class="form-group">
+          <label class="form-label">Upload Original Excel File</label>
+          <input type="file" id="orderFile" class="form-input" accept=".xlsx,.xls" onchange="handleFileUpload()">
+          <div id="fileDisplay" class="file-name"></div>
+        </div>
+      </div>
+
+      <!-- Submit Button -->
+      <div class="button-group">
+        <button class="btn btn-secondary" onclick="google.script.host.close()">
+          Cancel
+        </button>
+        <button class="btn btn-success btn-large" onclick="submitOrder()">
+          ✓ Submit Order
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <div id="loadingText" class="loading-text">Processing order...</div>
+  </div>
+</body>
+
+</html>

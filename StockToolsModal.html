@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include('UniversalStyles'); ?>
+  <style>
+    .stock-layout {
+      padding: 20px 24px 24px 24px;
+    }
+    .two-column {
+      display: grid;
+      grid-template-columns: 1.1fr 1.4fr;
+      gap: 20px;
+    }
+    .bin-list {
+      max-height: 260px;
+      overflow-y: auto;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(0,0,0,0.08);
+      background: rgba(255,255,255,0.7);
+    }
+    .bin-item {
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border-bottom: 1px solid rgba(0,0,0,0.04);
+    }
+    .bin-item:last-child { border-bottom: none; }
+    .bin-item:hover { background: #f3f4f6; }
+    .bin-item.active {
+      background: #111827;
+      color: #ffffff;
+    }
+    .bin-meta {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .chip {
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      border: 1px solid rgba(0,0,0,0.1);
+      background: #f9fafb;
+      white-space: nowrap;
+    }
+    .items-table-container {
+      max-height: 260px;
+      overflow-y: auto;
+      margin-top: 8px;
+    }
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+    .status-pill {
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(0,0,0,0.08);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .status-pill.ok {
+      border-color: var(--success);
+      color: var(--success);
+      background: #ecfdf5;
+    }
+    .status-pill.err {
+      border-color: var(--danger);
+      color: #b91c1c;
+      background: #fef2f2;
+    }
+  </style>
+</head>
+<body>
+  <div class="modal-container">
+    <div class="modal-header">
+      <h1>Stock Tools</h1>
+      <p>Skid put away and bin consolidation with LocationLog &amp; Stock_Totals tracking.</p>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-putaway" onclick="switchTab('putaway')">Skid Put-Away</button>
+      <button class="tab-btn" id="tab-consolidation" onclick="switchTab('consolidation')">Bin Consolidation</button>
+    </div>
+
+    <!-- PUT AWAY VIEW -->
+    <div id="view-putaway" class="tab-content active">
+      <div class="stock-layout">
+        <div class="two-column">
+          <!-- Source -->
+          <div class="section">
+            <div class="section-title">Source (Skids)</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label required">Source Tab</label>
+                <select id="put-source-tab" class="form-select" onchange="loadPutawaySources()">
+                  <option value="Inbound_Staging">Inbound_Staging</option>
+                  <option value="Bin_Stock">Bin_Stock</option>
+                  <option value="Floor_Stock_Levels">Floor_Stock_Levels</option>
+                </select>
+              </div>
+            </div>
+            <div class="bin-list" id="put-source-bins"></div>
+          </div>
+
+          <!-- Destination + Items -->
+          <div class="section">
+            <div class="section-title">Destination &amp; Skids</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label required">Destination Tab</label>
+                <select id="put-dest-tab" class="form-select" onchange="loadPutawayDestBins()">
+                  <option value="Bin_Stock">Bin_Stock</option>
+                  <option value="Floor_Stock_Levels">Floor_Stock_Levels</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label required">Destination Bin</label>
+                <select id="put-dest-bin" class="form-select"></select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Filter Bins</label>
+                <input type="text" id="put-dest-filter" class="form-input"
+                  placeholder="Type to filter bins (e.g. IB3, Row A...)"
+                  oninput="filterPutDestBins(this.value)">
+              </div>
+            </div>
+
+            <div class="items-table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th style="width:32px;"><input type="checkbox" id="put-select-all" onclick="togglePutawayAll(this)"></th>
+                    <th>FBPN</th>
+                    <th>SKU</th>
+                    <th>Qty</th>
+                    <th>Skid</th>
+                  </tr>
+                </thead>
+                <tbody id="put-items-body"></tbody>
+              </table>
+            </div>
+
+            <div class="button-group">
+              <button class="btn btn-secondary" onclick="google.script.host.close()">Close</button>
+              <button class="btn btn-primary" onclick="runPutaway()">Move Selected Skids</button>
+            </div>
+
+            <div class="status-row">
+              <div id="put-status"></div>
+              <div id="put-status-badge"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLIDATION VIEW -->
+    <div id="view-consolidation" class="tab-content">
+      <div class="stock-layout">
+        <div class="two-column">
+          <!-- Source Bin -->
+          <div class="section">
+            <div class="section-title">Source Bin (Consolidate From)</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label required">Source Tab</label>
+                <select id="cons-source-tab" class="form-select" onchange="loadConsolidationSources()">
+                  <option value="Bin_Stock">Bin_Stock</option>
+                  <option value="Floor_Stock_Levels">Floor_Stock_Levels</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Filter Source</label>
+                <input type="text" id="cons-source-filter" class="form-input"
+                  placeholder="Filter by FBPN, SKU, Bin, Project..."
+                  oninput="filterConsSourceBins(this.value)">
+              </div>
+            </div>
+            <div class="bin-list" id="cons-source-bins"></div>
+          </div>
+
+          <!-- Destination Bin + Preview -->
+          <div class="section">
+            <div class="section-title">Destination Bin (Consolidate Into)</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label required">Destination Tab</label>
+                <select id="cons-dest-tab" class="form-select" onchange="loadConsolidationDestBins()">
+                  <option value="Bin_Stock">Bin_Stock</option>
+                  <option value="Floor_Stock_Levels">Floor_Stock_Levels</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label required">Destination Bin</label>
+                <select id="cons-dest-bin" class="form-select"></select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Filter Bins</label>
+                <input type="text" id="cons-dest-filter" class="form-input"
+                  placeholder="Type to filter bins (e.g. IB3, Row A...)"
+                  oninput="filterConsDestBins(this.value)">
+              </div>
+            </div>
+
+            <div class="items-table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th style="width:32px;"></th>
+                    <th>FBPN</th>
+                    <th>SKU</th>
+                    <th>Qty</th>
+                    <th>Skid</th>
+                  </tr>
+                </thead>
+                <tbody id="cons-items-body"></tbody>
+              </table>
+            </div>
+
+            <div class="button-group">
+              <button class="btn btn-secondary" onclick="google.script.host.close()">Close</button>
+              <button class="btn btn-primary" onclick="runConsolidation()">Consolidate Bin</button>
+            </div>
+
+            <div class="status-row">
+              <div id="cons-status"></div>
+              <div id="cons-status-badge"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+  let putawayBins = {};
+  let selectedPutSourceBin = null;
+  let consBins = {};
+  let selectedConsSourceBin = null;
+  let selectedConsSkuKey = null;
+  let selectedConsItemIndex = null;
+  let putDestBins = {};
+  let consDestBins = {};
+
+  function switchTab(view) {
+    document.getElementById('view-putaway').classList.toggle('active', view === 'putaway');
+    document.getElementById('view-consolidation').classList.toggle('active', view === 'consolidation');
+    document.getElementById('tab-putaway').classList.toggle('active', view === 'putaway');
+    document.getElementById('tab-consolidation').classList.toggle('active', view === 'consolidation');
+  }
+
+  // ---------- SKU KEY HELPER ----------
+
+  function makeSkuKey(item) {
+    const sku = (item.sku || '').toString().trim();
+    if (sku) {
+      return 'SKU:' + sku.toUpperCase();
+    }
+    const fbpn = (item.fbpn || '').toString().trim().toUpperCase();
+    const mfr3 = (item.manufacturer || '').toString().trim().toUpperCase().substring(0, 3);
+    return 'FM:' + fbpn + '|' + mfr3;
+  }
+
+  // ---------- PUT AWAY ----------
+
+  function loadPutawaySources() {
+    const tab = document.getElementById('put-source-tab').value;
+    const container = document.getElementById('put-source-bins');
+    container.innerHTML = '<div class="bin-item">Loading...</div>';
+    document.getElementById('put-items-body').innerHTML = '';
+    selectedPutSourceBin = null;
+
+    google.script.run
+      .withSuccessHandler(function (bins) {
+        putawayBins = bins || {};
+        const labelMode = (tab === 'Inbound_Staging') ? 'fbpn' : 'bin';
+        renderBinList('put-source-bins', putawayBins, function (code) {
+          selectedPutSourceBin = code;
+          renderPutawayItems();
+        }, labelMode);
+      })
+      .withFailureHandler(showPutStatusError)
+      .getBinsWithInventory(tab);
+  }
+
+  function loadPutawayDestBins() {
+    const tab = document.getElementById('put-dest-tab').value;
+    const destSelect = document.getElementById('put-dest-bin');
+    destSelect.innerHTML = '<option value="">Loading...</option>';
+    document.getElementById('put-dest-filter').value = '';
+
+    google.script.run
+      .withSuccessHandler(function (bins) {
+        putDestBins = bins || {};
+        renderPutDestOptions('');
+      })
+      .withFailureHandler(showPutStatusError)
+      .getDestinationBins(tab, false);
+  }
+
+  function renderPutDestOptions(filterText) {
+    const destSelect = document.getElementById('put-dest-bin');
+    destSelect.innerHTML = '';
+    const term = (filterText || '').toLowerCase();
+    const codes = Object.keys(putDestBins || {}).sort();
+
+    codes.forEach(code => {
+      const bin = putDestBins[code];
+      const label = code + (bin.binName ? ' — ' + bin.binName : '');
+      if (!term || label.toLowerCase().includes(term)) {
+        const opt = document.createElement('option');
+        opt.value = code;
+        opt.textContent = label;
+        destSelect.appendChild(opt);
+      }
+    });
+
+    if (!destSelect.options.length) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'No bins match filter';
+      destSelect.appendChild(opt);
+    }
+  }
+
+  function filterPutDestBins(value) {
+    renderPutDestOptions(value);
+  }
+
+  function renderBinList(containerId, bins, onClick, labelMode) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+    const codes = Object.keys(bins || {}).sort();
+    if (!codes.length) {
+      container.innerHTML = '<div class="bin-item" style="color:var(--text-muted);">No bins with inventory.</div>';
+      return;
+    }
+    const mode = labelMode || 'bin';
+
+    codes.forEach(code => {
+      const bin = bins[code];
+      const div = document.createElement('div');
+      div.className = 'bin-item';
+      div.onclick = function () {
+        Array.from(container.children).forEach(c => c.classList.remove('active'));
+        div.classList.add('active');
+        onClick(code);
+      };
+
+      let mainLabel = '';
+      let meta = '';
+
+      if (mode === 'fbpn' && bin.items && bin.items.length) {
+        const firstItem = bin.items[0];
+        mainLabel = (firstItem.fbpn || '') + ' — ' + code;
+        meta = (bin.items.length || 0) + ' line(s) in bin';
+      } else {
+        mainLabel = code + (bin.binName ? ' — ' + bin.binName : '');
+        meta = (bin.items ? bin.items.length : 0) + ' line(s) in bin';
+      }
+
+      const left = document.createElement('div');
+      left.innerHTML = `
+        <div>${mainLabel}</div>
+        <div class="bin-meta">${meta}</div>`;
+
+      const right = document.createElement('div');
+      right.innerHTML = '<span class="chip">Bin</span>';
+
+      div.appendChild(left);
+      div.appendChild(right);
+      container.appendChild(div);
+    });
+  }
+
+  function renderPutawayItems() {
+    const tbody = document.getElementById('put-items-body');
+    tbody.innerHTML = '';
+    document.getElementById('put-select-all').checked = false;
+    if (!selectedPutSourceBin || !putawayBins[selectedPutSourceBin]) return;
+
+    (putawayBins[selectedPutSourceBin].items || []).forEach((item, idx) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="checkbox" data-idx="${idx}"></td>
+        <td>${item.fbpn || ''}</td>
+        <td>${item.sku || ''}</td>
+        <td>${item.currentQty || 0}</td>
+        <td>${item.skidId || ''}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function togglePutawayAll(cb) {
+    const body = document.getElementById('put-items-body');
+    Array.from(body.querySelectorAll('input[type="checkbox"]')).forEach(c => c.checked = cb.checked);
+  }
+
+  function runPutaway() {
+    clearPutStatus();
+    if (!selectedPutSourceBin || !putawayBins[selectedPutSourceBin]) {
+      return showPutStatusError('Select a source bin.');
+    }
+    const destTab = document.getElementById('put-dest-tab').value;
+    const destBin = document.getElementById('put-dest-bin').value;
+    if (!destBin) return showPutStatusError('Select a destination bin.');
+
+    const items = [];
+    const body = document.getElementById('put-items-body');
+    const sourceItems = putawayBins[selectedPutSourceBin].items || [];
+    Array.from(body.querySelectorAll('input[type="checkbox"]')).forEach(cb => {
+      if (cb.checked) {
+        const idx = Number(cb.getAttribute('data-idx'));
+        if (!isNaN(idx) && sourceItems[idx]) items.push(sourceItems[idx]);
+      }
+    });
+    if (!items.length) return showPutStatusError('Select at least one skid.');
+
+    const payload = {
+      sourceTab: document.getElementById('put-source-tab').value,
+      destTab: destTab,
+      sourceBinCode: selectedPutSourceBin,
+      destBinCode: destBin,
+      items: items
+    };
+
+    document.getElementById('put-status').textContent = 'Moving skids...';
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (res && res.success) {
+          showPutStatusOk(res.message || 'Skids moved.');
+          loadPutawaySources();
+        } else {
+          showPutStatusError(res && res.message ? res.message : 'Error moving skids.');
+        }
+      })
+      .withFailureHandler(showPutStatusError)
+      .moveSkid(payload);
+  }
+
+  function showPutStatusOk(msg) {
+    document.getElementById('put-status').textContent = msg;
+    document.getElementById('put-status-badge').innerHTML =
+      '<span class="status-pill ok">OK</span>';
+  }
+  function showPutStatusError(err) {
+    document.getElementById('put-status').textContent = String(err);
+    document.getElementById('put-status-badge').innerHTML =
+      '<span class="status-pill err">Error</span>';
+  }
+  function clearPutStatus() {
+    document.getElementById('put-status').textContent = '';
+    document.getElementById('put-status-badge').textContent = '';
+  }
+
+  // ---------- CONSOLIDATION ----------
+
+  function loadConsolidationSources() {
+    const tab = document.getElementById('cons-source-tab').value;
+    const container = document.getElementById('cons-source-bins');
+    container.innerHTML = '<div class="bin-item">Loading...</div>';
+    document.getElementById('cons-items-body').innerHTML = '';
+    selectedConsSourceBin = null;
+    selectedConsSkuKey = null;
+    selectedConsItemIndex = null;
+    document.getElementById('cons-source-filter').value = '';
+
+    google.script.run
+      .withSuccessHandler(function (bins) {
+        consBins = bins || {};
+        renderConsSourceBinList('');
+      })
+      .getBinsWithInventory(tab);
+  }
+
+  function renderConsSourceBinList(filterText) {
+    const container = document.getElementById('cons-source-bins');
+    container.innerHTML = '';
+    const term = (filterText || '').toLowerCase();
+    const codes = Object.keys(consBins || {}).sort();
+
+    if (!codes.length) {
+      container.innerHTML = '<div class="bin-item" style="color:var(--text-muted);">No bins with inventory.</div>';
+      return;
+    }
+
+    codes.forEach(code => {
+      const bin = consBins[code];
+      const items = bin.items || [];
+      if (!items.length) return;
+
+      let match = !term;
+      if (!match) {
+        const baseLabel = (code + ' ' + (bin.binName || '')).toLowerCase();
+        if (baseLabel.includes(term)) {
+          match = true;
+        } else {
+          for (let i = 0; i < items.length && !match; i++) {
+            const it = items[i];
+            const rowStr = [
+              it.fbpn || '',
+              it.sku || '',
+              it.manufacturer || '',
+              it.project || '',
+              it.skidId || ''
+            ].join(' ').toLowerCase();
+            if (rowStr.includes(term)) match = true;
+          }
+        }
+      }
+      if (!match) return;
+
+      const firstItem = items[0];
+      const mainLabel = (firstItem.fbpn || '') + ' — ' + code;
+      const meta = items.length + ' line(s) in bin';
+
+      const div = document.createElement('div');
+      div.className = 'bin-item';
+      div.onclick = function () {
+        Array.from(container.children).forEach(c => c.classList.remove('active'));
+        div.classList.add('active');
+        selectedConsSourceBin = code;
+        selectedConsItemIndex = null;
+        selectedConsSkuKey = null;
+        renderConsolidationItems();
+        // Destination options will be populated once a line is chosen
+      };
+
+      const left = document.createElement('div');
+      left.innerHTML = `
+        <div>${mainLabel}</div>
+        <div class="bin-meta">${meta}</div>`;
+
+      const right = document.createElement('div');
+      right.innerHTML = '<span class="chip">Bin</span>';
+
+      div.appendChild(left);
+      div.appendChild(right);
+      container.appendChild(div);
+    });
+
+    if (!container.children.length) {
+      container.innerHTML = '<div class="bin-item" style="color:var(--text-muted);">No bins match filter.</div>';
+    }
+  }
+
+  function filterConsSourceBins(value) {
+    renderConsSourceBinList(value);
+  }
+
+  function onConsItemSelect(idx) {
+    if (!selectedConsSourceBin || !consBins[selectedConsSourceBin]) return;
+    const items = consBins[selectedConsSourceBin].items || [];
+    if (!items[idx]) return;
+
+    selectedConsItemIndex = idx;
+    selectedConsSkuKey = makeSkuKey(items[idx]);
+    loadConsolidationDestBins();
+  }
+
+  function loadConsolidationDestBins() {
+    const tab = document.getElementById('cons-dest-tab').value;
+    const destSelect = document.getElementById('cons-dest-bin');
+    destSelect.innerHTML = '<option value="">Loading...</option>';
+    document.getElementById('cons-dest-filter').value = '';
+
+    google.script.run
+      .withSuccessHandler(function (bins) {
+        consDestBins = bins || {};
+        renderConsDestOptions('');
+      })
+      .getBinsWithInventory(tab);
+  }
+
+  function renderConsDestOptions(filterText) {
+    const destSelect = document.getElementById('cons-dest-bin');
+    destSelect.innerHTML = '';
+    const term = (filterText || '').toLowerCase();
+    const codes = Object.keys(consDestBins || {}).sort();
+
+    let added = 0;
+
+    codes.forEach(code => {
+      const sourceTab = document.getElementById('cons-source-tab').value;
+      const destTab = document.getElementById('cons-dest-tab').value;
+      if (sourceTab === destTab && selectedConsSourceBin && code === selectedConsSourceBin) return;
+
+      const bin = consDestBins[code];
+      const items = bin.items || [];
+      if (!items.length) return;
+
+      let skuMatch = true;
+      if (selectedConsSkuKey) {
+        skuMatch = items.some(it => makeSkuKey(it) === selectedConsSkuKey);
+      }
+      if (!skuMatch) return;
+
+      const label = code + (bin.binName ? ' — ' + bin.binName : '');
+      if (term && !label.toLowerCase().includes(term)) return;
+
+      const opt = document.createElement('option');
+      opt.value = code;
+      opt.textContent = label;
+      destSelect.appendChild(opt);
+      added++;
+    });
+
+    if (!added) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'No bins match SKU/filter';
+      destSelect.appendChild(opt);
+    }
+  }
+
+  function filterConsDestBins(value) {
+    renderConsDestOptions(value);
+  }
+
+  function renderConsolidationItems() {
+    const tbody = document.getElementById('cons-items-body');
+    tbody.innerHTML = '';
+    selectedConsSkuKey = null;
+    selectedConsItemIndex = null;
+
+    if (!selectedConsSourceBin || !consBins[selectedConsSourceBin]) return;
+
+    const items = consBins[selectedConsSourceBin].items || [];
+    items.forEach((item, idx) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="radio" name="consItemSelect" data-idx="${idx}" onclick="onConsItemSelect(${idx})"></td>
+        <td>${item.fbpn || ''}</td>
+        <td>${item.sku || ''}</td>
+        <td>${item.currentQty || 0}</td>
+        <td>${item.skidId || ''}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function runConsolidation() {
+    document.getElementById('cons-status').textContent = '';
+    document.getElementById('cons-status-badge').textContent = '';
+
+    if (!selectedConsSourceBin) {
+      return showConsStatusError('Select a source bin.');
+    }
+    if (selectedConsItemIndex === null) {
+      return showConsStatusError('Select a single line (FBPN) to move.');
+    }
+
+    const sourceTab = document.getElementById('cons-source-tab').value;
+    const destTab = document.getElementById('cons-dest-tab').value;
+    const destBin = document.getElementById('cons-dest-bin').value;
+
+    if (!destBin) return showConsStatusError('Select a destination bin.');
+    if (sourceTab === destTab && selectedConsSourceBin === destBin) {
+      return showConsStatusError('Source and destination cannot be the same bin.');
+    }
+
+    const items = consBins[selectedConsSourceBin].items || [];
+    const selectedItem = items[selectedConsItemIndex];
+    if (!selectedItem) return showConsStatusError('Invalid line selection.');
+
+    const payload = {
+      sourceTab: sourceTab,
+      destTab: destTab,
+      sourceBinCode: selectedConsSourceBin,
+      destBinCode: destBin,
+      items: [selectedItem]  // single FBPN line
+    };
+
+    document.getElementById('cons-status').textContent = 'Consolidating bin...';
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (res && res.success) {
+          showConsStatusOk(res.message || 'Consolidation complete.');
+          loadConsolidationSources();
+          loadConsolidationDestBins();
+        } else {
+          showConsStatusError(res && res.message ? res.message : 'Error consolidating.');
+        }
+      })
+      .withFailureHandler(showConsStatusError)
+      .consolidateBinInventory(payload);
+  }
+
+  function showConsStatusOk(msg) {
+    document.getElementById('cons-status').textContent = msg;
+    document.getElementById('cons-status-badge').innerHTML =
+      '<span class="status-pill ok">OK</span>';
+  }
+  function showConsStatusError(err) {
+    document.getElementById('cons-status').textContent = String(err);
+    document.getElementById('cons-status-badge').innerHTML =
+      '<span class="status-pill err">Error</span>';
+  }
+
+  // ---------- INIT ----------
+  window.addEventListener('load', function () {
+    loadPutawaySources();
+    loadPutawayDestBins();
+    loadConsolidationSources();
+    loadConsolidationDestBins();
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include('UniversalStyles'); ?>
+  <style>
+    /* Professional Dark Theme Overrides */
+
+    /* Stats Bar */
+    .stats-bar {
+      display: flex;
+      gap: 20px;
+      padding: 8px;
+      background: var(--bg-body);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      margin-top: 16px;
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--primary);
+      line-height: 1;
+    }
+
+    /* Items Table */
+    .items-table {
+      width: 100%;
+      max-height: 350px;
+      overflow-y: auto;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      margin-top: 8px;
+      background: var(--bg-body);
+    }
+
+    .items-table table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .items-table th {
+      position: sticky;
+      top: 0;
+      background: var(--bg-element);
+      color: var(--text-secondary);
+      padding: 12px 16px;
+      text-align: left;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      z-index: 10;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .items-table td {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.9rem;
+      color: var(--text-main);
+    }
+
+    .items-table tr:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .items-table input[type="checkbox"] {
+      cursor: pointer;
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-body);
+    }
+
+    /* Paste Area */
+    .paste-area {
+      width: 100%;
+      min-height: 150px;
+      padding: 8px;
+      border: 2px dashed var(--primary);
+      border-radius: var(--radius-md);
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      background: var(--bg-body);
+      color: var(--text-main);
+      resize: vertical;
+      transition: all 0.2s ease;
+    }
+
+    .paste-area:focus {
+      outline: none;
+      border-color: var(--primary-hover);
+      box-shadow: 0 0 0 3px var(--primary-light);
+    }
+
+    /* Skid Card Styling */
+    .skid-card {
+      background: var(--bg-body);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 15px;
+      margin-bottom: 8px;
+      transition: border-color 0.2s ease;
+    }
+
+    .skid-card:hover {
+      border-color: var(--primary);
+    }
+
+    .skid-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .skid-number {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .skid-items-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .skid-items-list li {
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.9rem;
+      color: var(--text-main);
+    }
+
+    .skid-items-list li:last-child {
+      border-bottom: none;
+    }
+
+    .skid-items-list input[type="number"] {
+      width: 80px;
+      padding: 6px 10px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      font-size: 0.9rem;
+      background: var(--bg-surface);
+      color: var(--text-main);
+      transition: all 0.2s;
+    }
+
+    .skid-items-list input[type="number"]:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px var(--primary-light);
+    }
+
+    /* Review Summary Overrides */
+    .review-section {
+      background: var(--bg-body);
+      padding: 20px;
+      border-radius: var(--radius-md);
+      margin-bottom: 20px;
+      border: 1px solid var(--border-color);
+    }
+
+    .review-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .review-item:last-child {
+      border-bottom: none;
+    }
+
+    .review-label {
+      font-weight: 500;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .review-value {
+      color: var(--text-main);
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+  </style>
+
+  <script>
+    let currentTab = 1;
+    let parsedItems = [];
+    let skidsData = [];
+    let submitWatchdog = null;
+
+    function combineItemsByFBPN(items) {
+      const map = new Map();
+      (items || []).forEach(it => {
+        const fbpn = String(it.fbpn || '').trim();
+        if (!fbpn) return;
+        const desc = String(it.description || '').trim();
+        const key = fbpn + '|' + desc;
+        const qty = Number(it.qtyRequested) || 0;
+        const selected = (it.selected !== false);
+        if (!map.has(key)) {
+          map.set(key, { fbpn, description: desc, qtyRequested: qty, selected });
+        } else {
+          const ex = map.get(key);
+          ex.qtyRequested += qty;
+          ex.selected = ex.selected || selected;
+        }
+      });
+      return Array.from(map.values());
+    }
+
+    // =========================================================================
+    // PAGE LOAD
+    // =========================================================================
+    window.onload = function() {
+      showTab(1);
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('date').value = today;
+      loadTaskNumbers();
+    };
+
+    // =========================================================================
+    // TASK DROPDOWN + AUTO LOAD ITEMS
+    // =========================================================================
+    function loadTaskNumbers() {
+      if (typeof google === 'undefined') { console.warn('Google API not available'); return; }
+      google.script.run
+        .withSuccessHandler(function(taskNumbers) {
+          const select = document.getElementById('taskNumber');
+          select.innerHTML = '<option value="">Select Task Number</option>';
+
+          (taskNumbers || []).forEach(task => {
+            const option = document.createElement('option');
+            option.value = task;
+            option.textContent = task;
+            select.appendChild(option);
+          });
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error loading task numbers:', error);
+          showAlert('Error loading task numbers: ' + (error && error.message ? error.message : error), 'danger');
+        })
+        .getTaskNumbers();
+    }
+
+    function onTaskNumberChange() {
+      const taskNumber = document.getElementById('taskNumber').value;
+
+      if (!taskNumber) {
+        // keep your existing UX: just clear out item table/state
+        parsedItems = [];
+        skidsData = [];
+        renderItemsTable();
+        updateStats();
+        return;
+      }
+
+      showLoading(true, 'Loading order items...');
+
+      if (typeof google === 'undefined') return;
+
+      google.script.run
+        .withSuccessHandler(function(orderData) {
+          showLoading(false);
+
+          // supports either shape: {header, items} OR flattened
+          const header = (orderData && orderData.header) ? orderData.header : orderData;
+
+          if (!orderData || !header) {
+            showAlert('No order found for this task number', 'warning');
+            return;
+          }
+
+          document.getElementById('orderNumber').value = header.orderId || header.Order_ID || '';
+          document.getElementById('orderTitle').value  = header.orderTitle || header.Order_Title || '';
+          document.getElementById('company').value     = header.company || header.Company || '';
+          document.getElementById('project').value     = header.project || header.Project || '';
+          // ADDED: Auto-populate delivery fields
+          document.getElementById('deliverTo').value   = header.deliverTo || '';
+          document.getElementById('name').value        = header.name || '';
+          document.getElementById('phoneNumber').value = header.phoneNumber || '';
+
+          const items = (orderData.items || header.items || []);
+          parsedItems = combineItemsByFBPN(items.map(it => ({
+            fbpn: it.fbpn || it.FBPN,
+            description: it.description || it.Description || '',
+            qtyRequested: Number(it.qtyRequested != null ? it.qtyRequested : it.Qty_Requested) || 0,
+            selected: true
+          })));
+
+          renderItemsTable();
+          updateStats();
+
+          if (parsedItems.length > 0) {
+            showAlert(`Loaded ${parsedItems.length} items from order`, 'success');
+          } else {
+            showAlert('Order loaded, but no Requested Items were found for this Task/Order key.', 'warning');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showLoading(false);
+          showAlert('Error loading order data: ' + (error && error.message ? error.message : error), 'danger');
+        })
+        .getOrderByTaskNumber(taskNumber);
+    }
+
+    // =========================================================================
+    // TAB NAVIGATION
+    // =========================================================================
+    function showTab(tabNumber) {
+      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+      document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+
+      document.getElementById('tab' + tabNumber).classList.add('active');
+      document.querySelector(`[onclick="showTab(${tabNumber})"]`).classList.add('active');
+
+      currentTab = tabNumber;
+      updateNavigationButtons();
+    }
+
+    function updateNavigationButtons() {
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+
+      prevBtn.style.display = (currentTab === 1) ? 'none' : 'inline-flex';
+      nextBtn.style.display = (currentTab === 3) ? 'none' : 'inline-flex';
+    }
+
+    function nextTab() {
+      if (currentTab === 1 && !validateTab1()) return;
+      if (currentTab === 2 && !validateTab2()) return;
+
+      if (currentTab < 3) {
+        showTab(currentTab + 1);
+        if (currentTab === 3) populateTab3();
+      }
+    }
+
+    function prevTab() {
+      if (currentTab > 1) showTab(currentTab - 1);
+    }
+
+    // =========================================================================
+    // TAB 1: VALIDATE + PASTE PARSER
+    // =========================================================================
+    function validateTab1() {
+      const required = ['orderNumber', 'taskNumber', 'company', 'project'];
+      let isValid = true;
+
+      required.forEach(field => {
+        const input = document.getElementById(field);
+        if (!input.value.trim()) {
+          input.style.borderColor = 'var(--danger)';
+          isValid = false;
+        } else {
+          input.style.borderColor = 'var(--border-color)';
+        }
+      });
+
+      if (!isValid) showAlert('Please fill in all required fields', 'danger');
+      return isValid;
+    }
+
+    function parsePastedData() {
+      const pasteArea = document.getElementById('pasteArea');
+      const pastedText = pasteArea.value.trim();
+
+      if (!pastedText) {
+        showAlert('Please paste data from Excel first', 'warning');
+        return;
+      }
+
+      const lines = pastedText.split('\n');
+      parsedItems = [];
+
+      lines.forEach(line => {
+        const cells = line.split('\t');
+        if (cells.length >= 3) {
+          const fbpn = (cells[0] || '').trim();
+          const description = (cells[1] || '').trim();
+          const qtyRequested = parseInt(cells[2], 10) || 0;
+
+          if (fbpn && qtyRequested > 0) {
+            parsedItems.push({ fbpn, description, qtyRequested, selected: true });
+          }
+        }
+      });
+
+      parsedItems = combineItemsByFBPN(parsedItems);
+
+      if (parsedItems.length === 0) {
+        showAlert('No valid items found. Make sure data has FBPN, Description, and Qty columns.', 'danger');
+        return;
+      }
+
+      renderItemsTable();
+      updateStats();
+      showAlert(`Successfully parsed ${parsedItems.length} items!`, 'success');
+    }
+
+    function renderItemsTable() {
+      const tbody = document.getElementById('itemsTableBody');
+      tbody.innerHTML = '';
+
+      if (!parsedItems.length) {
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">No items parsed yet</td></tr>`;
+        return;
+      }
+
+      parsedItems.forEach((item, index) => {
+        const row = tbody.insertRow();
+        row.innerHTML = `
+          <td><input type="checkbox" ${item.selected ? 'checked' : ''} onchange="toggleItemSelection(${index})"></td>
+          <td>${item.fbpn}</td>
+          <td>${item.description}</td>
+          <td>${item.qtyRequested}</td>
+        `;
+      });
+    }
+
+    function toggleItemSelection(index) {
+      parsedItems[index].selected = !parsedItems[index].selected;
+      updateStats();
+    }
+
+    function updateStats() {
+      const selectedItems = parsedItems.filter(item => item.selected);
+      const totalQty = selectedItems.reduce((sum, item) => sum + item.qtyRequested, 0);
+
+      document.getElementById('statItemCount').textContent = selectedItems.length;
+      document.getElementById('statTotalQty').textContent = totalQty;
+    }
+
+    // =========================================================================
+    // TAB 2: BUILD SKIDS
+    // =========================================================================
+    function validateTab2() {
+      const selectedItems = parsedItems.filter(item => item.selected);
+      if (selectedItems.length === 0) {
+        showAlert('Please select at least one item from Tab 1', 'danger');
+        return false;
+      }
+
+      const skidCount = parseInt(document.getElementById('skidCount').value, 10);
+      if (!skidCount || skidCount < 1) {
+        showAlert('Please enter the number of skids', 'danger');
+        return false;
+      }
+
+      if (skidsData.length === 0) buildSkidsData();
+
+      const hasItemsWithQty = skidsData.some(skid => skid.items.some(item => (item.qtyOnSkid || 0) > 0));
+      if (!hasItemsWithQty) {
+        showAlert('Please add items to at least one skid and specify quantities', 'warning');
+        return false;
+      }
+
+      return true;
+    }
+
+    function buildSkidsData() {
+      const skidCount = parseInt(document.getElementById('skidCount').value, 10);
+      const selectedItems = parsedItems.filter(item => item.selected);
+
+      skidsData = [];
+      for (let i = 0; i < skidCount; i++) skidsData.push({ skidNumber: i + 1, items: [] });
+
+      renderSkidBuilder();
+    }
+
+    function renderSkidBuilder() {
+      const container = document.getElementById('skidsBuilderContainer');
+      container.innerHTML = '';
+
+      skidsData.forEach((skid, skidIndex) => {
+        const skidDiv = document.createElement('div');
+        skidDiv.className = 'skid-card';
+        skidDiv.innerHTML = `
+          <div class="skid-card-header">
+            <span class="skid-number">Skid #${skid.skidNumber}</span>
+            <span class="text-muted" style="font-size: 0.9rem;">${skid.items.length} items</span>
+            <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.8rem;" onclick="duplicateSkid(${skidIndex})" title="Copy items to next skid">📋 Duplicate</button>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Add items to this skid:</label>
+            <select class="form-select" onchange="addItemToSkid(${skidIndex}, this.value); this.value='';">
+              <option value="">Select item...</option>
+              ${getAvailableItemsOptions(skidIndex)}
+            </select>
+          </div>
+          <ul class="skid-items-list" id="skid-${skidIndex}-items">
+            ${renderSkidItems(skidIndex)}
+          </ul>
+        `;
+        container.appendChild(skidDiv);
+      });
+    }
+
+    // UPDATED: Duplicate Skid to Below
+    function duplicateSkid(index) {
+      if (index >= skidsData.length - 1) {
+        showAlert('No empty skid below to copy to. Please increase "Total Skids" first.', 'warning');
+        return;
+      }
+      
+      const sourceItems = skidsData[index].items;
+      // Copy items to next skid (overwrite)
+      skidsData[index + 1].items = JSON.parse(JSON.stringify(sourceItems));
+      
+      renderSkidBuilder();
+      showAlert(`Copied Skid ${index + 1} items to Skid ${index + 2}`, 'success');
+    }
+
+    function getAvailableItemsOptions(skidIndex) {
+      const selectedItems = parsedItems.filter(item => item.selected);
+
+      const allocatedQtys = {};
+      skidsData.forEach(skid => {
+        skid.items.forEach(skidItem => {
+          allocatedQtys[skidItem.fbpn] = (allocatedQtys[skidItem.fbpn] || 0) + (skidItem.qtyOnSkid || 0);
+        });
+      });
+
+      return selectedItems
+        .map((item, index) => {
+          const allocated = allocatedQtys[item.fbpn] || 0;
+          const remaining = item.qtyRequested - allocated;
+          if (remaining <= 0) return null;
+          return `<option value="${index}">${item.fbpn} - ${item.description} (${remaining} remaining)</option>`;
+        })
+        .filter(Boolean)
+        .join('');
+    }
+
+    function addItemToSkid(skidIndex, itemIndexStr) {
+      if (!itemIndexStr) return;
+
+      const itemIndex = parseInt(itemIndexStr, 10);
+      const selectedItems = parsedItems.filter(item => item.selected);
+      const item = selectedItems[itemIndex];
+      if (!item) return;
+
+      const existingItem = skidsData[skidIndex].items.find(i => i.fbpn === item.fbpn);
+      if (existingItem) {
+        showAlert('This item is already on this skid', 'warning');
+        return;
+      }
+
+      let totalAllocated = 0;
+      skidsData.forEach(skid => {
+        const skidItem = skid.items.find(i => i.fbpn === item.fbpn);
+        if (skidItem) totalAllocated += skidItem.qtyOnSkid || 0;
+      });
+
+      const remainingQty = item.qtyRequested - totalAllocated;
+      if (remainingQty <= 0) {
+        showAlert('This item has been fully allocated to other skids', 'warning');
+        return;
+      }
+
+      skidsData[skidIndex].items.push({
+        fbpn: item.fbpn,
+        description: item.description,
+        qtyRequested: item.qtyRequested,
+        qtyOnSkid: remainingQty
+      });
+
+      renderSkidBuilder();
+    }
+
+    function renderSkidItems(skidIndex) {
+      const items = skidsData[skidIndex].items;
+      if (items.length === 0) {
+        return '<li class="text-muted" style="text-align: center; padding: 12px;">No items added yet</li>';
+      }
+
+      return items.map((item, itemIndex) => {
+        let allocatedElsewhere = 0;
+        skidsData.forEach((skid, sIdx) => {
+          if (sIdx !== skidIndex) {
+            const otherItem = skid.items.find(i => i.fbpn === item.fbpn);
+            if (otherItem) allocatedElsewhere += otherItem.qtyOnSkid || 0;
+          }
+        });
+        const maxForThisSkid = item.qtyRequested - allocatedElsewhere;
+
+        return `
+          <li>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="flex: 1;">
+                <strong>${item.fbpn}</strong> - ${item.description}
+                <br><span class="text-muted" style="font-size: 0.8rem;">Requested: ${item.qtyRequested} | Max: ${maxForThisSkid}</span>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="number"
+                       value="${item.qtyOnSkid}"
+                       min="0"
+                       max="${maxForThisSkid}"
+                       onchange="updateSkidItemQty(${skidIndex}, ${itemIndex}, this.value, ${maxForThisSkid})"
+                       placeholder="Qty">
+                <button class="btn btn-danger btn-small" onclick="removeItemFromSkid(${skidIndex}, ${itemIndex})">✕</button>
+              </div>
+            </div>
+          </li>
+        `;
+      }).join('');
+    }
+
+    function updateSkidItemQty(skidIndex, itemIndex, qty, maxAllowed) {
+      let newQty = parseInt(qty, 10) || 0;
+      if (maxAllowed !== undefined && newQty > maxAllowed) {
+        newQty = maxAllowed;
+        showAlert(`Maximum quantity for this skid is ${maxAllowed}`, 'warning');
+      }
+      skidsData[skidIndex].items[itemIndex].qtyOnSkid = newQty;
+      renderSkidBuilder();
+    }
+
+    function removeItemFromSkid(skidIndex, itemIndex) {
+      skidsData[skidIndex].items.splice(itemIndex, 1);
+      renderSkidBuilder();
+    }
+
+    // =========================================================================
+    // TAB 3: SUMMARY + SUBMIT (2-step to prevent timeouts)
+    // =========================================================================
+    function populateTab3() {
+      document.getElementById('summaryOrderNumber').textContent = document.getElementById('orderNumber').value;
+      document.getElementById('summaryTaskNumber').textContent = document.getElementById('taskNumber').value;
+      document.getElementById('summaryCompany').textContent = document.getElementById('company').value;
+      document.getElementById('summaryProject').textContent = document.getElementById('project').value;
+
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('shipDate').value = today;
+
+      const skidsSummary = document.getElementById('skidsSummaryList');
+      skidsSummary.innerHTML = '';
+
+      skidsData.forEach(skid => {
+        const totalQty = skid.items.reduce((sum, item) => sum + (item.qtyOnSkid || 0), 0);
+        const li = document.createElement('li');
+        li.style.marginBottom = '12px';
+        li.innerHTML = `<strong style="color: var(--primary);">Skid ${skid.skidNumber}:</strong> ${skid.items.length} items, ${totalQty} total units`;
+
+        if (skid.items.length > 0) {
+          const itemsList = document.createElement('ul');
+          itemsList.style.marginLeft = '20px';
+          itemsList.style.marginTop = '4px';
+          itemsList.style.fontSize = '0.9rem';
+          itemsList.style.color = 'var(--text-secondary)';
+
+          skid.items.forEach(item => {
+            const itemLi = document.createElement('li');
+            itemLi.textContent = `${item.fbpn}: ${item.qtyOnSkid || 0} units`;
+            itemsList.appendChild(itemLi);
+          });
+
+          li.appendChild(itemsList);
+        }
+
+        skidsSummary.appendChild(li);
+      });
+    }
+
+    function startWatchdog_() {
+      stopWatchdog_();
+      submitWatchdog = setTimeout(function() {
+        showLoading(false);
+        showAlert('Still working… this can take a few minutes for large orders. Check Apps Script Executions if it does not finish.', 'warning');
+      }, 8 * 60 * 1000);
+    }
+
+    function stopWatchdog_() {
+      if (submitWatchdog) clearTimeout(submitWatchdog);
+      submitWatchdog = null;
+    }
+
+    function processCompleteShipment() {
+      if (typeof google === 'undefined') return alert('Google API unavailable');
+
+      const shipDate = document.getElementById('shipDate').value;
+      if (!shipDate) {
+        showAlert('Please enter a ship date', 'danger');
+        return;
+      }
+
+      const docsOnly = !!(document.getElementById('docsOnlyMode') && document.getElementById('docsOnlyMode').checked);
+
+      showLoading(true, docsOnly ? 'Creating documents (Docs Only)…' : 'Creating documents…');
+      startWatchdog_();
+
+      const formData = collectFormData();
+      formData.shipDate = shipDate;
+      formData.carrier = document.getElementById('carrier').value || '';
+      formData.trackingNumber = document.getElementById('trackingNumber').value || '';
+      formData.bolNumber = document.getElementById('bolNumber').value || '';
+      formData.skids = skidsData;
+
+      // IMPORTANT: Qty Requested must be Qty Requested (not shipped)
+      const tocItems = [];
+      parsedItems.filter(item => item.selected).forEach(item => {
+        tocItems.push({
+          fbpn: item.fbpn,
+          description: item.description || '',
+          qtyRequested: Number(item.qtyRequested) || 0
+        });
+      });
+      formData.items = tocItems;
+
+      // flag for server
+      formData.docsOnly = docsOnly;
+
+      // CALL SERVER
+      const method = docsOnly ? 'processPackingTOC_DocsOnly' : 'processPackingTOCAndShipment';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          stopWatchdog_();
+          showLoading(false);
+
+          if (result && result.success) {
+            showAlert('Shipment completed successfully!', 'success');
+            document.getElementById('shipmentResults').style.display = 'block';
+
+            let docsHtml = '';
+            if (result.tocUrl) docsHtml += `<p><a href="${result.tocUrl}" target="_blank" style="color: var(--primary);">📄 Transfer of Custody</a></p>`;
+            if (result.packingListsUrl) docsHtml += `<p><a href="${result.packingListsUrl}" target="_blank" style="color: var(--primary);">📦 Packing Lists Folder</a></p>`;
+            if (result.packingLists && result.packingLists.length > 0) {
+              result.packingLists.forEach(pl => {
+                docsHtml += `<p style="margin-left: 20px;"><a href="${pl.url}" target="_blank" style="color: var(--text-muted);">└ ${pl.name}</a></p>`;
+              });
+            }
+            document.getElementById('documentLinks').innerHTML = docsHtml || '<p style="color: var(--text-muted);">No documents generated</p>';
+
+            let summaryHtml = `
+              <p style="color: var(--text-muted);">Order Status: <strong style="color: var(--success);">${docsOnly ? 'Docs Only' : 'Delivered'}</strong></p>
+              <p style="color: var(--text-muted);">Pick Log Updates: <strong style="color: var(--text-main);">${result.pickLogUpdates || 0}</strong></p>
+              <p style="color: var(--text-muted);">Inventory Updates: <strong style="color: var(--text-main);">${result.inventoryUpdates || 0}</strong></p>
+              <p style="color: var(--text-muted);">Outbound Log Entries: <strong style="color: var(--text-main);">${result.outboundLogEntries || 0}</strong></p>
+            `;
+            if (result.backordersCreated > 0) summaryHtml += `<p style="color: var(--warning);">⚠️ Backorders Created: <strong>${result.backordersCreated}</strong></p>`;
+            document.getElementById('shipmentSummary').innerHTML = summaryHtml;
+
+          } else {
+            showAlert('Error: ' + (result ? result.message : 'Unknown error - check Apps Script logs'), 'danger');
+          }
+        })
+        .withFailureHandler(function(error) {
+          stopWatchdog_();
+          showLoading(false);
+          console.error('Error:', error);
+          showAlert('Error: ' + (error && error.message ? error.message : error), 'danger');
+        })
+        [method](formData);
+    }
+
+    function collectFormData() {
+      return {
+        date: document.getElementById('date').value,
+        orderNumber: document.getElementById('orderNumber').value,
+        orderTitle: document.getElementById('orderTitle').value,
+        taskNumber: document.getElementById('taskNumber').value,
+        company: document.getElementById('company').value,
+        project: document.getElementById('project').value,
+        deliverTo: document.getElementById('deliverTo').value,
+        name: document.getElementById('name').value,
+        phoneNumber: document.getElementById('phoneNumber').value,
+        totalSkids: String(skidsData.length || 0)
+      };
+    }
+
+    // =========================================================================
+    // UTILITY FUNCTIONS
+    // =========================================================================
+    function showAlert(message, type) {
+      const alertDiv = document.createElement('div');
+      alertDiv.className = `alert alert-${type}`;
+      alertDiv.textContent = message;
+
+      const container = document.querySelector('.tab-content.active');
+      container.insertBefore(alertDiv, container.firstChild);
+
+      setTimeout(() => alertDiv.remove(), 5000);
+    }
+
+    function showLoading(show, message = 'Processing...') {
+      const overlay = document.getElementById('loadingOverlay');
+      const text = document.getElementById('loadingText');
+      if (text) text.textContent = message;
+
+      if (show) overlay.classList.add('active');
+      else overlay.classList.remove('active');
+    }
+
+    // required helper used above
+    function findColByHeader_(headers, candidates) {
+      if (!headers || !headers.length) return null;
+      const norm = headers.map(h => String(h || '').trim().toLowerCase());
+      for (let i = 0; i < candidates.length; i++) {
+        const c = String(candidates[i] || '').trim().toLowerCase();
+        const idx = norm.indexOf(c);
+        if (idx >= 0) return idx;
+      }
+      return null;
+    }
+  </script>
+</head>
+
+<body>
+  <div class="modal-container">
+    <div class="modal-header">
+      <h1>📦 Create Packing Lists & Transfer of Custody</h1>
+      <p>Generate packing lists per skid and overall transfer of custody</p>
+    </div>
+
+    <div class="tab-navigation">
+      <button class="tab-button active" onclick="showTab(1)">1. Info & Paste</button>
+      <button class="tab-button" onclick="showTab(2)">2. Build Skids</button>
+      <button class="tab-button" onclick="showTab(3)">3. Generate</button>
+    </div>
+
+    <!-- Tab 1: Info & Paste -->
+    <div id="tab1" class="tab-content active">
+      <div class="form-section">
+        <h2 class="form-section-title">Project Information</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Date</label>
+            <input type="date" id="date" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label required">Project</label>
+            <input type="text" id="project" class="form-input" placeholder="Project (auto-filled)" readonly>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label required">Order Number</label>
+            <input type="text" id="orderNumber" class="form-input" placeholder="Order Number (auto-filled)" readonly>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Order Title</label>
+            <input type="text" id="orderTitle" class="form-input" placeholder="Order Title (auto-filled)" readonly>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label required">Task Number</label>
+            <select id="taskNumber" class="form-select" onchange="onTaskNumberChange()">
+              <option value="">Select Task Number</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label required">Company</label>
+            <input type="text" id="company" class="form-input" placeholder="Company (auto-filled)" readonly>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Deliver To</label>
+            <input type="text" id="deliverTo" class="form-input" placeholder="Enter delivery location">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Contact Name</label>
+            <input type="text" id="name" class="form-input" placeholder="Enter contact name">
+          </div>
+        </div>
+
+        <div class="form-row full-width">
+          <div class="form-group">
+            <label class="form-label">Phone Number</label>
+            <input type="tel" id="phoneNumber" class="form-input" placeholder="Enter phone number">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h2 class="form-section-title">Paste Order Lines</h2>
+        <div class="alert alert-info">
+          <strong>Instructions:</strong> Copy your order lines from Excel (FBPN, Description, Qty Requested columns) and paste below.
+        </div>
+
+        <textarea id="pasteArea" class="paste-area" placeholder="Paste lines from Excel here (FBPN, Description, Qty)..."></textarea>
+
+        <button type="button" class="btn btn-primary mt-2" onclick="parsePastedData()">
+          📊 Parse Pasted Data
+        </button>
+
+        <div class="stats-bar">
+          <div class="stat-item">
+            <span class="stat-label">Items Selected</span>
+            <span class="stat-value" id="statItemCount">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Total Quantity</span>
+            <span class="stat-value" id="statTotalQty">0</span>
+          </div>
+        </div>
+
+        <div class="items-table">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 50px;">Select</th>
+                <th>FBPN</th>
+                <th>Description</th>
+                <th style="width: 100px;">Qty Requested</th>
+              </tr>
+            </thead>
+            <tbody id="itemsTableBody">
+              <tr>
+                <td colspan="4" class="text-center text-muted">No items parsed yet</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Build Skids -->
+    <div id="tab2" class="tab-content">
+      <div class="form-section">
+        <h2 class="form-section-title">Configure Skids</h2>
+        <div class="form-group" style="max-width: 300px;">
+          <label class="form-label required">Number of Skids</label>
+          <input type="number" id="skidCount" class="form-input" min="1" placeholder="Enter skid count" onchange="buildSkidsData()">
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h2 class="form-section-title">Build Each Skid</h2>
+        <div class="alert alert-info">
+          <strong>Instructions:</strong> Add items to each skid and specify the quantity on each skid.
+        </div>
+        <div id="skidsBuilderContainer">
+          <p class="text-muted text-center">Enter the number of skids above to begin</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 3: Generate -->
+    <div id="tab3" class="tab-content">
+      <div class="form-section">
+        <h2 class="form-section-title">Order Summary</h2>
+        <div class="review-section">
+          <div class="review-item">
+            <span class="review-label">Order Number:</span>
+            <span class="review-value" id="summaryOrderNumber"></span>
+          </div>
+          <div class="review-item">
+            <span class="review-label">Task Number:</span>
+            <span class="review-value" id="summaryTaskNumber"></span>
+          </div>
+          <div class="review-item">
+            <span class="review-label">Company:</span>
+            <span class="review-value" id="summaryCompany"></span>
+          </div>
+          <div class="review-item">
+            <span class="review-label">Project:</span>
+            <span class="review-value" id="summaryProject"></span>
+          </div>
+        </div>
+
+        <h3 style="margin: 24px 0 16px 0; font-size: 1rem; color: var(--text-main);">Skids Configured:</h3>
+        <ul id="skidsSummaryList" style="margin-left: 20px; color: var(--text-main);"></ul>
+      </div>
+
+      <div class="form-section">
+        <h2 class="form-section-title">Shipment Details</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Ship Date</label>
+            <input type="date" id="shipDate" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Carrier</label>
+            <input type="text" id="carrier" class="form-input" placeholder="Enter carrier name">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Tracking Number</label>
+            <input type="text" id="trackingNumber" class="form-input" placeholder="Enter tracking number (optional)">
+          </div>
+          <div class="form-group">
+            <label class="form-label">BOL Number</label>
+            <input type="text" id="bolNumber" class="form-input" placeholder="Enter BOL number (optional)">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h2 class="form-section-title">Complete Shipment</h2>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px;">
+          This will generate all shipping documents and process the outbound shipment:
+        </p>
+        <ul style="color: var(--text-muted); font-size: 0.9rem; margin-left: 20px; margin-bottom: 24px; line-height: 1.6;">
+          <li>Generate Transfer of Custody (TOC)</li>
+          <li>Generate Packing Lists (one per skid)</li>
+          <li>Update Pick_Log with shipped status</li>
+          <li>Reduce inventory from bins</li>
+          <li>Log to OutboundLog and LocationLog</li>
+          <li>Update Customer_Orders status to Shipped</li>
+        </ul>
+
+        <div style="display:flex; align-items:center; gap:10px; margin: 0 0 14px 0;">
+          <input type="checkbox" id="docsOnlyMode" style="transform: scale(1.15);">
+          <label for="docsOnlyMode" style="color: var(--text-muted); font-size: 0.95rem; cursor:pointer;">
+            Docs Only (rebuild TOC + packing lists) — no inventory updates
+          </label>
+        </div>
+
+        <button type="button" class="btn btn-success btn-large" onclick="processCompleteShipment()" style="width: 100%; padding: 16px; font-size: 1rem;">
+          🚚 Generate Documents & Complete Shipment
+        </button>
+
+        <div id="shipmentResults" class="mt-2" style="display: none;">
+          <div class="review-section" style="margin-top: 16px;">
+            <h3 style="color: var(--text-main); margin-bottom: 12px; font-size: 1rem;">📄 Generated Documents</h3>
+            <div id="documentLinks"></div>
+          </div>
+          <div class="review-section" style="margin-top: 16px;">
+            <h3 style="color: var(--text-main); margin-bottom: 12px; font-size: 1rem;">✅ Shipment Summary</h3>
+            <div id="shipmentSummary"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="button-group">
+      <button type="button" id="prevBtn" class="btn btn-secondary" onclick="prevTab()">← Previous</button>
+      <button type="button" id="nextBtn" class="btn btn-primary" onclick="nextTab()">Next →</button>
+    </div>
+  </div>
+
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <div id="loadingText" class="loading-text">Generating documents...</div>
+  </div>
+</body>
+</html>

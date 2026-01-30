@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <?!= include('UniversalStyles'); ?>
+  <style>
+    /* Professional Dark Theme Overrides */
+    .items-table {
+      max-height: 350px;
+      overflow-y: auto;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      margin-top: 16px;
+      background: var(--bg-body);
+    }
+
+    .items-table table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .items-table th {
+      position: sticky;
+      top: 0;
+      background: var(--bg-element);
+      padding: 12px 16px;
+      text-align: left;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      z-index: 10;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .items-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.9rem;
+      color: var(--text-main);
+    }
+
+    .items-table tr:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .paste-area {
+      width: 100%;
+      min-height: 150px;
+      padding: 16px;
+      border: 2px dashed var(--primary);
+      border-radius: var(--radius-md);
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      background: var(--bg-body);
+      color: var(--text-main);
+      resize: vertical;
+      transition: all 0.2s ease;
+    }
+
+    .paste-area:focus {
+      outline: none;
+      border-color: var(--primary-hover);
+      box-shadow: 0 0 0 3px var(--primary-light);
+    }
+
+    details>summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--primary);
+      padding: 8px 0;
+      user-select: none;
+      transition: color 0.2s;
+    }
+
+    details>summary:hover {
+      color: var(--primary-hover);
+    }
+  </style>
+  <script>
+    let parsedItems = [];
+
+    window.onload = function () {
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('date').value = today;
+      loadTaskNumbers();
+    };
+
+    function loadTaskNumbers() {
+      google.script.run
+        .withSuccessHandler(function (taskNumbers) {
+          const select = document.getElementById('taskNumber');
+          if (!select) return;
+          select.innerHTML = '<option value="">Select Task Number</option>';
+
+          if (!taskNumbers || !taskNumbers.length) {
+            console.warn('No task numbers returned from server');
+            showAlert('No active task numbers found in spreadsheet.', 'warning');
+            return;
+          }
+
+          taskNumbers.forEach(task => {
+            if (!task) return;
+            const option = document.createElement('option');
+            option.value = task;
+            option.textContent = task;
+            select.appendChild(option);
+          });
+        })
+        .withFailureHandler(function (error) {
+          console.error('Error loading task numbers:', error);
+          showAlert('Error loading task numbers: ' + (error.message || error), 'danger');
+        })
+        .getTaskNumbers();
+    }
+
+    function onTaskNumberChange() {
+      const taskNumber = document.getElementById('taskNumber').value;
+
+      if (!taskNumber) {
+        clearForm();
+        return;
+      }
+
+      showLoading(true, 'Loading order items...');
+
+      google.script.run
+        .withSuccessHandler(function (orderData) {
+          showLoading(false);
+
+          if (!orderData) {
+            showAlert('No order found for this task number', 'warning');
+            return;
+          }
+
+          document.getElementById('orderNumber').value = orderData.orderId || '';
+          document.getElementById('orderTitle').value = orderData.orderTitle || '';
+          document.getElementById('company').value = orderData.company || '';
+          document.getElementById('project').value = orderData.project || '';
+
+          parsedItems = orderData.items || [];
+          renderItemsTable();
+
+          if (parsedItems.length > 0) {
+            showAlert(`Loaded ${parsedItems.length} items from order`, 'success');
+          }
+        })
+        .withFailureHandler(function (error) {
+          showLoading(false);
+          showAlert('Error loading order data: ' + error.message, 'danger');
+        })
+        .getOrderByTaskNumber(taskNumber);
+    }
+
+    function clearForm() {
+      document.getElementById('orderNumber').value = '';
+      document.getElementById('orderTitle').value = '';
+      document.getElementById('company').value = '';
+      document.getElementById('project').value = '';
+      document.getElementById('trackNumber').value = '';
+      document.getElementById('requestId').value = '';
+      document.getElementById('pasteArea').value = '';
+      parsedItems = [];
+      renderItemsTable();
+    }
+
+    function parsePastedData() {
+      const pasteArea = document.getElementById('pasteArea');
+      const pastedText = pasteArea.value.trim();
+
+      if (!pastedText) {
+        showAlert('Please paste data from Excel first', 'warning');
+        return;
+      }
+
+      const lines = pastedText.split('\n');
+      parsedItems = [];
+
+      lines.forEach(line => {
+        const cells = line.split('\t');
+        if (cells.length >= 3) {
+          const fbpn = cells[0].trim();
+          const description = cells[1].trim();
+          const qtyRequested = parseInt(cells[2]) || 0;
+
+          if (fbpn && qtyRequested > 0) {
+            parsedItems.push({
+              fbpn: fbpn,
+              description: description,
+              qtyRequested: qtyRequested
+            });
+          }
+        }
+      });
+
+      if (parsedItems.length === 0) {
+        showAlert('No valid items found. Make sure data has FBPN, Description, and Qty columns.', 'danger');
+        return;
+      }
+
+      renderItemsTable();
+      showAlert(`Successfully parsed ${parsedItems.length} items!`, 'success');
+    }
+
+    function renderItemsTable() {
+      const tbody = document.getElementById('itemsTableBody');
+      tbody.innerHTML = '';
+
+      if (parsedItems.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted" style="padding: 30px;">No items loaded yet</td></tr>';
+        return;
+      }
+
+      parsedItems.forEach((item, index) => {
+        const row = tbody.insertRow();
+        row.innerHTML = `
+          <td>${index + 2}</td>
+          <td><strong style="color: var(--text-main);">${item.fbpn}</strong></td>
+          <td>${item.description || ''}</td>
+          <td>${item.qtyRequested}</td>
+        `;
+      });
+    }
+
+    function generatePickTicket() {
+      if (parsedItems.length === 0) {
+        showAlert('Please select a task number or paste items first', 'danger');
+        return;
+      }
+
+      const formData = {
+        date: document.getElementById('date').value,
+        orderNumber: document.getElementById('orderNumber').value,
+        orderTitle: document.getElementById('orderTitle').value,
+        taskNumber: document.getElementById('taskNumber').value,
+        company: document.getElementById('company').value,
+        project: document.getElementById('project').value,
+        trackNumber: document.getElementById('trackNumber').value,
+        requestId: document.getElementById('requestId').value,
+        items: parsedItems
+      };
+
+      if (!formData.orderNumber || !formData.taskNumber || !formData.company || !formData.project) {
+        showAlert('Please fill in all required fields', 'danger');
+        return;
+      }
+
+      showLoading(true, 'Generating Pick Ticket...');
+
+      google.script.run
+        .withSuccessHandler(function (result) {
+          showLoading(false);
+          if (result.success) {
+            showAlert('Pick Ticket generated successfully!', 'success');
+            // Updated to use result.pdfUrl
+            document.getElementById('resultLink').innerHTML =
+              `<a href="${result.pdfUrl}" target="_blank" class="btn btn-success"> View ${result.name}</a>`;
+          } else {
+            showAlert('Error: ' + result.message, 'danger');
+          }
+        })
+        .withFailureHandler(function (error) {
+          showLoading(false);
+          showAlert('Error: ' + error.message, 'danger');
+        })
+        .generatePickTicket(formData);
+    }
+
+    function showAlert(message, type) {
+      const alertDiv = document.createElement('div');
+      alertDiv.className = `alert alert-${type}`;
+      alertDiv.textContent = message;
+
+      const container = document.querySelector('.modal-container');
+      const header = container.querySelector('.modal-header');
+      header.parentNode.insertBefore(alertDiv, header.nextSibling);
+
+      setTimeout(() => alertDiv.remove(), 5000);
+    }
+
+    function showLoading(show, message = 'Processing...') {
+      const overlay = document.getElementById('loadingOverlay');
+      const text = document.getElementById('loadingText');
+      if (text) text.textContent = message;
+
+      if (show) {
+        overlay.classList.add('active');
+      } else {
+        overlay.classList.remove('active');
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div class="modal-container">
+    <div class="modal-header">
+      <h1>Generate Pick Ticket</h1>
+      <p>Create a warehouse pick ticket with bin locations</p>
+    </div>
+
+    <div style="padding: 25px;">
+      <div class="form-section">
+        <h2 class="form-section-title">Order Information</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Date</label>
+            <input type="date" id="date" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label required">Project</label>
+            <input type="text" id="project" class="form-input" placeholder="Auto-filled" readonly>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label required">Order Number</label>
+            <input type="text" id="orderNumber" class="form-input" placeholder="Auto-filled" readonly>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Order Title</label>
+            <input type="text" id="orderTitle" class="form-input" placeholder="Auto-filled" readonly>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label required">Task Number</label>
+            <select id="taskNumber" class="form-select" onchange="onTaskNumberChange()">
+              <option value="">Select Task Number</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label required">Company</label>
+            <input type="text" id="company" class="form-input" placeholder="Auto-filled" readonly>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Track Number</label>
+            <input type="text" id="trackNumber" class="form-input" placeholder="Optional">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Request ID</label>
+            <input type="text" id="requestId" class="form-input" placeholder="Optional">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h2 class="form-section-title">Items to Pick</h2>
+        <div class="alert alert-info">
+          <strong>Auto-Load:</strong> Items are automatically loaded when you select a Task Number above.
+        </div>
+
+        <div class="items-table">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 50px;">#</th>
+                <th>FBPN</th>
+                <th>Description</th>
+                <th style="width: 100px;">Qty Requested</th>
+              </tr>
+            </thead>
+            <tbody id="itemsTableBody">
+              <tr>
+                <td colspan="4" class="text-center text-muted" style="padding: 30px;">No items loaded yet</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <details style="margin-top: 20px;">
+          <summary>Manual Paste (Optional)</summary>
+          <div style="margin-top: 12px;">
+            <textarea id="pasteArea" class="paste-area"
+              placeholder="Paste lines from Excel here (FBPN, Description, Qty)..."></textarea>
+            <button type="button" class="btn btn-primary mt-2" onclick="parsePastedData()">Parse Pasted Data</button>
+          </div>
+        </details>
+      </div>
+
+      <div class="form-section" style="border: none; background: transparent; padding: 0;">
+        <div class="button-group" style="border-top: none; padding-top: 0;">
+          <button class="btn btn-secondary" onclick="google.script.host.close()">Close</button>
+          <button class="btn btn-success btn-large" onclick="generatePickTicket()">Generate Pick Ticket</button>
+        </div>
+        <div id="resultLink" class="mt-2 text-center" style="margin-top: 16px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <div id="loadingText" class="loading-text">Generating Pick Ticket...</div>
+  </div>
+</body>
+
+</html>

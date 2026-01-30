@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!-- Extend Universal Styles -->
+  <?!= include('UniversalStyles'); ?>
+  <style>
+    /* ============================================================================
+       BIN UPDATE STYLES - GLASS EXTENSION
+       ============================================================================ */
+
+    /* Stats Cards */
+    .stats-bar {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .stat-card, .stat-box, .stat-item {
+      flex: 1;
+      min-width: 140px;
+      background: var(--bg-surface);
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      text-align: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+      transition: transform 0.2s;
+    }
+    
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    }
+
+    .stat-value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--primary);
+      line-height: 1.2;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+
+    /* Bin Preview List */
+    .bin-preview {
+      background: rgba(255, 255, 255, 0.5);
+      border: 1px solid rgba(0,0,0,0.05);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      margin-top: 20px;
+    }
+    
+    .bin-preview-title {
+      font-size: 0.9rem; font-weight: 600; color: var(--text-main); margin-bottom: 12px;
+    }
+
+    .fbpn-list {
+      max-height: 250px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .fbpn-item {
+      background: var(--bg-surface);
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+
+    .fbpn-code {
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .fbpn-qty {
+      font-size: 0.9rem;
+      font-weight: 600;
+      background: rgba(0,0,0,0.05);
+      padding: 4px 8px;
+      border-radius: 4px;
+      color: var(--text-main);
+    }
+    
+    .fbpn-details {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Entry Cards (for multi-add/remove) */
+    .entry-card {
+      background: var(--bg-surface);
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      margin-bottom: 16px;
+      position: relative;
+      transition: box-shadow 0.2s;
+    }
+    
+    .entry-card:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    
+    .entry-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    .entry-number {
+      font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);
+      background: rgba(0,0,0,0.05); padding: 4px 8px; border-radius: 4px;
+    }
+    
+    .remove-entry-btn {
+      color: var(--danger); font-size: 0.8rem; cursor: pointer; background: transparent; border: none;
+    }
+
+    /* Search Panel */
+    .search-panel {
+      background: rgba(255, 255, 255, 0.5);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .filter-chip {
+      padding: 6px 12px;
+      background: var(--bg-surface);
+      border: 1px solid rgba(0,0,0,0.1);
+      border-radius: 20px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: var(--text-secondary);
+    }
+    
+    .filter-chip:hover, .filter-chip.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-muted);
+      font-style: italic;
+      background: rgba(0,0,0,0.02);
+      border-radius: var(--radius-md);
+      border: 1px dashed rgba(0,0,0,0.1);
+    }
+    
+    /* Barcode Scanner (Light) */
+    .barcode-scanner {
+      background: var(--bg-surface);
+      border: 1px solid rgba(0,0,0,0.1);
+      border-radius: var(--radius-md);
+      padding: 25px;
+      margin-bottom: 20px;
+      text-align: center;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+    }
+    
+    .scan-icon { font-size: 48px; margin-bottom: 10px; }
+    
+    .barcode-input {
+      background: #f9fafb;
+      border: 2px solid #e5e7eb;
+      color: var(--text-main);
+      font-family: 'Courier New', monospace;
+      text-align: center;
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+    
+    .barcode-input:focus {
+      border-color: var(--primary);
+      background: #fff;
+    }
+
+  </style>
+</head>
+</html>

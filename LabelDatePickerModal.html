@@ -1,0 +1,193 @@
+<!-- LabelDatePickerModal.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include('UniversalStyles'); ?>
+  <style>
+    .wrap { padding: 16px; }
+    .title { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+    .sub { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; }
+    .card {
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      background: var(--bg-card);
+    }
+    .toggle {
+      display:flex; gap:10px; align-items:center; margin-bottom: 12px;
+      padding: 10px; border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      background: var(--bg-body);
+    }
+    .toggle input { transform: translateY(1px); }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .row.one { grid-template-columns: 1fr; }
+    label { display:block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600; }
+    input[type="date"]{
+      width: 100%;
+      padding: 10px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-color);
+      background: var(--bg-body);
+      color: var(--text);
+      outline: none;
+    }
+    .actions { display:flex; gap:10px; justify-content:flex-end; margin-top: 14px; }
+    .btn {
+      padding: 10px 12px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+      background: var(--bg-card);
+      color: var(--text);
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .btn.primary {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: #fff;
+    }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .status {
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 10px;
+      border-radius: var(--radius-md);
+      border: 1px dashed var(--border-color);
+      background: var(--bg-body);
+      white-space: pre-wrap;
+    }
+    .hidden { display:none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="title">Generate Labels — Past Inbounds</div>
+    <div class="sub">Select a day or a date range. This runs the library generator through your IMS_Shell wrapper.</div>
+
+    <div class="card">
+      <div class="toggle">
+        <label style="margin:0; font-weight:700; color:var(--text);">Mode</label>
+
+        <label style="margin:0; display:flex; gap:6px; align-items:center; font-weight:600; color:var(--text);">
+          <input type="radio" name="mode" value="single" checked onchange="setMode('single')">
+          Single Day
+        </label>
+
+        <label style="margin:0; display:flex; gap:6px; align-items:center; font-weight:600; color:var(--text);">
+          <input type="radio" name="mode" value="range" onchange="setMode('range')">
+          Date Range
+        </label>
+      </div>
+
+      <div id="singleWrap" class="row one">
+        <div>
+          <label for="singleDate">Date</label>
+          <input id="singleDate" type="date" onchange="validate()" />
+        </div>
+      </div>
+
+      <div id="rangeWrap" class="row hidden">
+        <div>
+          <label for="startDate">Start Date</label>
+          <input id="startDate" type="date" onchange="validate()" />
+        </div>
+        <div>
+          <label for="endDate">End Date</label>
+          <input id="endDate" type="date" onchange="validate()" />
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn" onclick="google.script.host.close()">Cancel</button>
+        <button id="runBtn" class="btn primary" onclick="run()" disabled>Generate</button>
+      </div>
+
+      <div id="status" class="status hidden"></div>
+    </div>
+  </div>
+
+  <script>
+    function setMode(mode) {
+      document.getElementById('singleWrap').classList.toggle('hidden', mode !== 'single');
+      document.getElementById('rangeWrap').classList.toggle('hidden', mode !== 'range');
+      validate();
+    }
+
+    function getMode() {
+      const r = document.querySelector('input[name="mode"]:checked');
+      return r ? r.value : 'single';
+    }
+
+    function validate() {
+      const mode = getMode();
+      const runBtn = document.getElementById('runBtn');
+
+      if (mode === 'single') {
+        const d = document.getElementById('singleDate').value;
+        runBtn.disabled = !d;
+        return;
+      }
+
+      const s = document.getElementById('startDate').value;
+      const e = document.getElementById('endDate').value;
+      if (!s || !e) { runBtn.disabled = true; return; }
+      runBtn.disabled = (new Date(s) > new Date(e));
+    }
+
+    function setStatus(msg, show) {
+      const el = document.getElementById('status');
+      el.textContent = msg || '';
+      el.classList.toggle('hidden', !show);
+    }
+
+    function run() {
+      const mode = getMode();
+      const runBtn = document.getElementById('runBtn');
+      runBtn.disabled = true;
+
+      let startDate, endDate;
+      if (mode === 'single') {
+        startDate = document.getElementById('singleDate').value;
+        endDate = startDate;
+      } else {
+        startDate = document.getElementById('startDate').value;
+        endDate = document.getElementById('endDate').value;
+      }
+
+      setStatus('Generating labels...\n(Calling IMS_Shell -> IMS_LIB)', true);
+
+      // IMPORTANT: HTML can only call functions in the Sheet project.
+      // This calls your IMS_Shell wrapper: shell_generateLabelsForAllPastInbounds(startDate, endDate)
+      google.script.run
+        .withSuccessHandler(function(res) {
+          setStatus(res || 'Done.', true);
+          runBtn.disabled = false;
+        })
+        .withFailureHandler(function(err) {
+          setStatus('ERROR:\n' + (err && err.message ? err.message : err), true);
+          runBtn.disabled = false;
+        })
+        .shell_generateLabelsForAllPastInbounds(startDate, endDate);
+    }
+
+    (function init() {
+      // Default date inputs to today (local)
+      const t = new Date();
+      const y = t.getFullYear();
+      const m = String(t.getMonth() + 1).padStart(2, '0');
+      const d = String(t.getDate()).padStart(2, '0');
+      const ymd = `${y}-${m}-${d}`;
+
+      document.getElementById('singleDate').value = ymd;
+      document.getElementById('startDate').value = ymd;
+      document.getElementById('endDate').value = ymd;
+
+      validate();
+    })();
+  </script>
+</body>
+</html>

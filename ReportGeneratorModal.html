@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include('UniversalStyles'); ?>
+  <style>
+    /* Professional Theme Overrides */
+    
+    .report-type-selector {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    
+    .report-card {
+      background: var(--bg-body);
+      border: 2px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .report-card:hover {
+      border-color: var(--primary);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .report-card.selected {
+      background: var(--bg-surface);
+      border-color: var(--primary);
+      box-shadow: 0 0 0 1px var(--primary);
+    }
+    
+    .report-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+    
+    .report-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 8px;
+    }
+    
+    .report-description {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+    
+    .preset-buttons {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    
+    .preset-btn {
+      padding: 10px 14px;
+      background: transparent;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-weight: 500;
+    }
+    
+    .preset-btn:hover {
+      background: var(--bg-surface);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+    
+    .preset-btn.active {
+      background: var(--primary);
+      color: var(--text-inverse);
+      border-color: var(--primary);
+    }
+  </style>
+  <script>
+    let selectedReportType = '';
+    let selectedPreset = '';
+    
+    function selectReportType(type) {
+      selectedReportType = type;
+      
+      document.querySelectorAll('.report-card').forEach(card => {
+        card.classList.remove('selected');
+      });
+      document.getElementById('report-' + type).classList.add('selected');
+      document.getElementById('dateRangeSection').style.display = 'block';
+    }
+    
+    function selectPreset(preset) {
+      selectedPreset = preset;
+      
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      event.target.classList.add('active');
+      
+      google.script.run
+        .withSuccessHandler(function(dateRange) {
+          document.getElementById('startDate').value = convertToInputDate(dateRange.startDate);
+          document.getElementById('endDate').value = convertToInputDate(dateRange.endDate);
+        })
+        .getDateRangePreset(preset);
+    }
+    
+    function convertToInputDate(dateString) {
+      // dateString format is likely mm/dd/yyyy from backend
+      const parts = dateString.split('/');
+      // Return yyyy-mm-dd
+      return `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+    }
+    
+    function generateReport() {
+      if (!selectedReportType) {
+        showAlert('Please select a report type', 'warning');
+        return;
+      }
+      
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+      
+      if (!startDate || !endDate) {
+        showAlert('Please select date range', 'warning');
+        return;
+      }
+      
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+      
+      let frequency;
+      if (daysDiff <= 1) {
+        frequency = 'Daily';
+      } else if (daysDiff <= 7) {
+        frequency = 'Weekly';
+      } else {
+        frequency = 'Monthly';
+      }
+      
+      const params = {
+        frequency: frequency,
+        startDate: startDate,
+        endDate: endDate
+      };
+      
+      showLoading(true, 'Generating ' + selectedReportType + ' report...');
+      
+      const functionName = selectedReportType === 'inbound' ? 'generateInboundReport' : 'generateOutboundReport';
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          showLoading(false);
+          
+          if (result.success) {
+            showSuccess(result);
+          } else {
+            showAlert(result.message, 'danger');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showLoading(false);
+          showAlert('Error: ' + error.message, 'danger');
+        })
+        [functionName](params);
+    }
+    
+    function showSuccess(result) {
+      const successDiv = document.getElementById('successPanel');
+      successDiv.innerHTML = `
+        <div class="alert alert-success">
+          <strong>Report Generated Successfully!</strong>
+          <br>
+          ${result.rowCount} records included in report
+        </div>
+        <div style="text-align: center; margin-top: 20px;">
+          <a href="${result.url}" target="_blank" class="btn btn-success btn-large">
+            View ${result.name}
+          </a>
+        </div>
+      `;
+      successDiv.style.display = 'block';
+      successDiv.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    function showAlert(message, type) {
+      const alertDiv = document.createElement('div');
+      alertDiv.className = `alert alert-${type}`;
+      alertDiv.textContent = message;
+      
+      const container = document.querySelector('.modal-container');
+      const firstChild = container.querySelector('.modal-header').nextElementSibling;
+      container.insertBefore(alertDiv, firstChild);
+      
+      setTimeout(() => alertDiv.remove(), 5000);
+    }
+    
+    function showLoading(show, message = 'Processing...') {
+      const overlay = document.getElementById('loadingOverlay');
+      const text = document.getElementById('loadingText');
+      text.textContent = message;
+      if(show) overlay.classList.add('active');
+      else overlay.classList.remove('active');
+    }
+    
+    window.onload = function() {
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('startDate').value = today;
+      document.getElementById('endDate').value = today;
+    };
+  </script>
+</head>
+<body>
+  <div class="modal-container">
+    <div class="modal-header">
+      <h1>Generate Reports</h1>
+      <p>Create inbound and outbound inventory reports</p>
+    </div>
+    
+    <div style="padding: 25px;">
+      <!-- Report Type Selection -->
+      <div class="form-section">
+        <h2 class="form-section-title">1. Select Report Type</h2>
+        
+        <div class="report-type-selector">
+          <div id="report-inbound" class="report-card" onclick="selectReportType('inbound')">
+            <div class="report-icon">📥</div>
+            <div class="report-title">Inbound Report</div>
+            <div class="report-description">Track incoming inventory from Master_Log</div>
+          </div>
+          
+          <div id="report-outbound" class="report-card" onclick="selectReportType('outbound')">
+            <div class="report-icon">📤</div>
+            <div class="report-title">Outbound Report</div>
+            <div class="report-description">Track outgoing inventory from OutboundLog</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Date Range Selection -->
+      <div id="dateRangeSection" class="form-section" style="display: none;">
+        <h2 class="form-section-title">2. Select Date Range</h2>
+        
+        <div class="alert alert-info">
+          <strong>Quick Presets:</strong> Click a preset below or manually select dates
+        </div>
+        
+        <div class="preset-buttons">
+          <button class="preset-btn" onclick="selectPreset('today')">Today</button>
+          <button class="preset-btn" onclick="selectPreset('yesterday')">Yesterday</button>
+          <button class="preset-btn" onclick="selectPreset('thisWeek')">This Week</button>
+          <button class="preset-btn" onclick="selectPreset('lastWeek')">Last Week</button>
+          <button class="preset-btn" onclick="selectPreset('thisMonth')">This Month</button>
+          <button class="preset-btn" onclick="selectPreset('lastMonth')">Last Month</button>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label required">Start Date</label>
+            <input type="date" id="startDate" class="form-input">
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label required">End Date</label>
+            <input type="date" id="endDate" class="form-input">
+          </div>
+        </div>
+        
+        <div class="button-group" style="border-top: none; padding-top: 0;">
+          <button class="btn btn-secondary" onclick="google.script.host.close()">Close</button>
+          <button class="btn btn-success btn-large" onclick="generateReport()">Generate Report</button>
+        </div>
+      </div>
+      
+      <!-- Success Panel -->
+      <div id="successPanel" style="display: none; margin-top: 24px;"></div>
+    </div>
+  </div>
+  
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <div id="loadingText" class="loading-text">Processing...</div>
+  </div>
+</body>
+</html>

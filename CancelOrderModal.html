@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <?!= include('UniversalStyles'); ?>
+    <style>
+      .cancel-container {
+        max-width: 520px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .cancel-row { margin-bottom: 12px; }
+      select, button {
+        width: 100%;
+        padding: 8px 10px;
+        border-radius: 6px;
+        border: 1px solid rgba(148, 163, 184, 0.6);
+        background: rgba(15, 23, 42, 0.8);
+        color: #e5e7eb;
+      }
+      button {
+        cursor: pointer;
+        font-weight: 600;
+        margin-top: 8px;
+      }
+      .btn-danger {
+        background: #b91c1c;
+        border-color: #ef4444;
+      }
+      .btn-danger:hover {
+        background: #dc2626;
+      }
+      .status-text {
+        font-size: 12px;
+        opacity: 0.8;
+        margin-top: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="cancel-container card">
+      <h2 class="card-title">Cancel Customer Order</h2>
+      <p class="card-subtitle">
+        Select an order to cancel. This will remove its Requested_Items,
+        Allocation_Log and Backorders rows.
+      </p>
+
+      <div class="cancel-row">
+        <label for="orderSelect">Order</label>
+        <select id="orderSelect">
+          <option value="">Loading orders...</option>
+        </select>
+        <div id="orderInfo" class="status-text"></div>
+      </div>
+
+      <div class="cancel-row">
+        <button class="btn-danger" onclick="onCancelClick()">Cancel Selected Order</button>
+        <button onclick="google.script.host.close()">Close</button>
+      </div>
+
+      <div id="result" class="status-text"></div>
+    </div>
+
+    <script>
+      function loadOrders() {
+        google.script.run
+          .withSuccessHandler(populateOrders)
+          .withFailureHandler(err => {
+            document.getElementById('orderSelect').innerHTML =
+              '<option value="">Error loading orders</option>';
+            document.getElementById('result').textContent = err.message || err;
+          })
+          .imsGetOpenOrdersForCancel();
+      }
+
+      function populateOrders(orders) {
+        const sel = document.getElementById('orderSelect');
+        sel.innerHTML = '<option value="">Select an order…</option>';
+
+        if (!orders || !orders.length) {
+          sel.innerHTML = '<option value="">No cancellable orders found</option>';
+          return;
+        }
+
+        orders.forEach(o => {
+          const opt = document.createElement('option');
+          opt.value = o.orderId;
+          opt.textContent =
+            `${o.orderId} | ${o.company || ''} | ${o.project || ''} | ${o.status || ''}`;
+          opt.dataset.info = JSON.stringify(o);
+          sel.appendChild(opt);
+        });
+      }
+
+      function onCancelClick() {
+        const sel = document.getElementById('orderSelect');
+        const orderId = sel.value;
+        const resultEl = document.getElementById('result');
+
+        if (!orderId) {
+          resultEl.textContent = 'Select an order first.';
+          return;
+        }
+
+        resultEl.textContent = 'Cancelling…';
+
+        google.script.run
+          .withSuccessHandler(res => {
+            resultEl.textContent = res.message || 'Done.';
+          })
+          .withFailureHandler(err => {
+            resultEl.textContent = err.message || String(err);
+          })
+          .cancelOrderAndCleanup(orderId);
+      }
+
+      document.addEventListener('DOMContentLoaded', loadOrders);
+    </script>
+  </body>
+</html>

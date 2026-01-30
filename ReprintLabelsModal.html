@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include('UniversalStyles'); ?>
+  <style>
+    .layout-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    
+    .controls {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 15px;
+      background: var(--bg-surface);
+      padding: 15px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+      align-items: end;
+    }
+    
+    .list-container {
+      flex: 1;
+      overflow-y: auto;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      margin-bottom: 15px;
+    }
+    
+    .skid-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    
+    .skid-table th {
+      position: sticky;
+      top: 0;
+      background: var(--bg-element);
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+    
+    .skid-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-main);
+    }
+    
+    .skid-table tr:hover {
+      background: rgba(255,255,255,0.03);
+    }
+    
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+  </style>
+  <script>
+    let allSkids = [];
+
+    function loadData() {
+      const sheet = document.getElementById('sourceSheet').value;
+      const btn = document.getElementById('loadBtn');
+      btn.disabled = true;
+      btn.textContent = 'Loading...';
+      
+      google.script.run
+        .withSuccessHandler(renderTable)
+        .withFailureHandler(err => {
+           alert('Error: ' + err.message);
+           btn.disabled = false;
+           btn.textContent = 'Load Skids';
+        })
+        .getReprintCandidates(sheet);
+    }
+
+    function renderTable(data) {
+      allSkids = data || [];
+      document.getElementById('loadBtn').disabled = false;
+      document.getElementById('loadBtn').textContent = 'Load Skids';
+      filterTable();
+    }
+
+    function filterTable() {
+      const term = document.getElementById('search').value.toLowerCase();
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '';
+      
+      const filtered = allSkids.filter(item => {
+        const str = `${item.skidId} ${item.fbpn} ${item.binCode}`.toLowerCase();
+        return str.includes(term);
+      });
+      
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#888;">No items found</td></tr>';
+        return;
+      }
+      
+      filtered.forEach((item, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><input type="checkbox" class="skid-check" data-idx="${allSkids.indexOf(item)}"></td>
+          <td>${item.skidId}</td>
+          <td>${item.binCode}</td>
+          <td>${item.fbpn}</td>
+          <td>${item.qty}</td>
+          <td>${item.description}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function toggleAll(source) {
+      document.querySelectorAll('.skid-check').forEach(cb => cb.checked = source.checked);
+    }
+
+    function printLabels() {
+      const selectedChecks = document.querySelectorAll('.skid-check:checked');
+      
+      if (selectedChecks.length === 0) {
+        alert('Please select at least one skid.');
+        return;
+      }
+      
+      // Clean and sanitize data to prevent serialization errors (Error 400)
+      const selected = [];
+      selectedChecks.forEach(cb => {
+        const idx = parseInt(cb.dataset.idx);
+        const item = allSkids[idx];
+        if (item) {
+          // Strictly typed object for serialization
+          selected.push({
+            skidId: String(item.skidId || ''),
+            binCode: String(item.binCode || ''),
+            fbpn: String(item.fbpn || ''),
+            qty: parseInt(item.qty, 10) || 0, // Ensure strictly integer
+            description: String(item.description || '')
+          });
+        }
+      });
+      
+      console.log('Sending print payload:', JSON.stringify(selected));
+
+      const btn = document.getElementById('printBtn');
+      btn.disabled = true;
+      btn.textContent = 'Generating PDF...';
+      
+      google.script.run
+        .withSuccessHandler(url => {
+          btn.disabled = false;
+          btn.textContent = 'Print Selected';
+          if (url) {
+            window.open(url, '_blank');
+          } else {
+            alert('Error generating label URL. No URL returned.');
+          }
+        })
+        .withFailureHandler(err => {
+          btn.disabled = false;
+          btn.textContent = 'Print Selected';
+          console.error('Print error:', err);
+          alert('Error: ' + err.message);
+        })
+        .processReprintRequest(selected);
+    }
+  </script>
+</head>
+<body>
+  <div class="layout-container">
+    <div class="header">
+      <h1>Reprint Skid Labels</h1>
+    </div>
+    
+    <div class="controls">
+      <div class="form-group" style="width: 200px;">
+        <label class="form-label">Source Sheet</label>
+        <select id="sourceSheet" class="form-select">
+          <option value="Inbound_Staging">Inbound Staging</option>
+          <option value="Bin_Stock">Bin Stock</option>
+        </select>
+      </div>
+      <button id="loadBtn" class="btn btn-secondary" onclick="loadData()">Load Skids</button>
+      
+      <div class="form-group" style="flex:1;">
+        <label class="form-label">Search</label>
+        <input id="search" class="form-input" placeholder="Filter by Skid ID, Bin, or FBPN..." onkeyup="filterTable()">
+      </div>
+    </div>
+    
+    <div class="list-container">
+      <table class="skid-table">
+        <thead>
+          <tr>
+            <th width="30"><input type="checkbox" onclick="toggleAll(this)"></th>
+            <th>Skid ID</th>
+            <th>Bin</th>
+            <th>FBPN</th>
+            <th>Qty</th>
+            <th>Desc/Project</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    
+    <div class="actions">
+      <button class="btn btn-secondary" onclick="google.script.host.close()">Close</button>
+      <button id="printBtn" class="btn btn-primary" onclick="printLabels()">Print Selected</button>
+    </div>
+  </div>
+</body>
+</html>

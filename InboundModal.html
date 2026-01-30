@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include('UniversalStyles'); ?>
+  <style>
+    /* ... (Keep existing styles) ... */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .form-grid.three-col {
+      grid-template-columns: repeat(3, 1fr);
+    }
+    
+    /* Skid Cards (Tab 2) */
+    .skid-card {
+      background: #ffffff;
+      border: 1px solid var(--border-color, #e5e7eb);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      position: relative;
+      transition: all 0.2s ease;
+    }
+    
+    .skid-card:hover {
+      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+      border-color: #d1d5db;
+    }
+    
+    .skid-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 15px;
+      margin-bottom: 15px;
+      border-bottom: 1px solid var(--border-color, #e5e7eb);
+    }
+    
+    .skid-title {
+      font-weight: 700;
+      color: var(--primary);
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    /* Item Rows within Skids */
+    .item-row {
+      display: flex;
+      gap: 15px;
+      align-items: flex-end;
+      margin-bottom: 12px;
+      background: #f9fafb;
+      padding: 10px;
+      border-radius: var(--radius-sm);
+    }
+    
+    /* Review Section (Tab 3) */
+    .review-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1px;
+      background: var(--border-color, #e5e7eb);
+      border: 1px solid var(--border-color, #e5e7eb);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+    
+    .review-item {
+      background: white;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .review-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+    
+    .review-value {
+      font-weight: 600;
+      color: var(--text-main);
+      font-size: 0.95rem;
+    }
+    
+    .summary-card {
+      background: white;
+      border: 1px solid var(--border-color, #e5e7eb);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      text-align: center;
+      flex: 1;
+    }
+    
+    .summary-label {
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    
+    .summary-value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    
+    /* File Upload Styling */
+    .file-upload-wrapper {
+      position: relative;
+      overflow: hidden;
+      display: inline-block;
+      width: 100%;
+    }
+    
+    .file-status {
+      margin-top: 5px;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+    
+    /* Badge Overrides */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    
+    .status-complete { background: #d1fae5; color: #065f46; }
+    .status-warning { background: #fef3c7; color: #92400e; }
+    .status-danger { background: #fee2e2; color: #991b1b; }
+    .status-pending { background: #f3f4f6; color: #4b5563; }
+
+  </style>
+  <script>
+    let currentTab = 1;
+    let skidCounter = 1;
+    let currentSkidView = 1;  // Track which skid is currently visible
+    let fbpnList = [];  // Store FBPN list from Item_Master
+    let formData = {
+      tab1: {},
+      skids: []
+    };
+    
+    // =========================================================================
+    // TAB NAVIGATION
+    // =========================================================================
+    
+    function showTab(tabNumber) {
+      // Hide all tabs
+      document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      
+      // Show selected tab
+      const tabElement = document.getElementById('tab' + tabNumber);
+      if (tabElement) {
+        tabElement.classList.add('active');
+      } else {
+        console.error('Tab element not found: tab' + tabNumber);
+        return;
+      }
+
+      const tabBtn = document.querySelector(`[onclick="showTab(${tabNumber})"]`);
+      if (tabBtn) tabBtn.classList.add('active');
+      
+      currentTab = tabNumber;
+      updateNavigationButtons();
+    }
+    
+    function updateNavigationButtons() {
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const submitBtn = document.getElementById('submitBtn');
+      
+      // Previous button
+      if (currentTab === 1) {
+        prevBtn.style.display = 'none';
+      } else {
+        prevBtn.style.display = 'inline-flex';
+      }
+      
+      // Next/Submit buttons
+      if (currentTab === 3) {
+        nextBtn.style.display = 'none';
+        submitBtn.style.display = 'inline-flex';
+      } else {
+        nextBtn.style.display = 'inline-flex';
+        submitBtn.style.display = 'none';
+      }
+    }
+    
+    function nextTab() {
+      if (currentTab === 1) {
+        if (!validateTab1()) return;
+        saveTab1Data();
+        markTabCompleted(1);
+        
+        // Ensure skids are initialized, but don't wipe them if they exist
+        const container = document.getElementById('skidsContainer');
+        if (container && container.children.length === 0) {
+           initializeSkidsFromCount();
+        }
+        
+        showTab(2);
+        return; // Explicit return to prevent fall-through
+      }
+      
+      if (currentTab === 2) {
+        if (!validateTab2()) return; // Validation fails logic handles alerts
+        
+        // Try saving data
+        try {
+          saveTab2Data();
+        } catch (e) {
+          console.error("Save Error:", e);
+          showAlert("Error saving data: " + e.message, "danger");
+          return;
+        }
+
+        markTabCompleted(2);
+        
+        // Try populating review
+        try {
+          populateReview();
+        } catch (e) {
+          console.error("Review Error:", e);
+          showAlert("Error generating review: " + e.message, "danger");
+          // If Tab 1 data missing, redirect
+          if (!formData.tab1 || !formData.tab1.deliveryDate) {
+             showTab(1);
+          }
+          return;
+        }
+        
+        showTab(3);
+        return; // Explicit return
+      }
+    }
+    
+    function prevTab() {
+      if (currentTab > 1) {
+        showTab(currentTab - 1);
+      }
+    }
+    
+    function markTabCompleted(tabNumber) {
+      const btn = document.querySelector(`[onclick="showTab(${tabNumber})"]`);
+      if (btn) btn.classList.add('completed');
+    }
+    
+    // =========================================================================
+    // TAB 1: BASIC INFO
+    // =========================================================================
+    
+    function validateTab1() {
+      const required = ['deliveryDate', 'warehouse', 'pushNumber', 'customerPO', 'project', 'carrier', 'manufacturer', 'bolNumber', 'totalSkidCountInput'];
+      let isValid = true;
+
+      required.forEach(field => {
+        const input = document.getElementById(field);
+        if (input && (!input.value || (field === 'totalSkidCountInput' && parseInt(input.value) < 1))) {
+          input.style.borderColor = 'var(--danger)';
+          isValid = false;
+        } else if (input) {
+          input.style.borderColor = 'var(--border-color)';
+        }
+      });
+
+      if (!isValid) {
+        showAlert('Please fill in all required fields. Total Skid Count must be at least 1.', 'danger');
+        window.scrollTo(0,0);
+      }
+
+      return isValid;
+    }
+    
+    function saveTab1Data() {
+      const getVal = (id) => {
+        const el = document.getElementById(id);
+        return el ? el.value : '';
+      };
+
+      formData.tab1 = {
+        deliveryDate: getVal('deliveryDate'),
+        warehouse: getVal('warehouse'),
+        pushNumber: getVal('pushNumber'),
+        customerPO: getVal('customerPO'),
+        project: getVal('project'),
+        carrier: getVal('carrier'),
+        manufacturer: getVal('manufacturer'),
+        bolNumber: getVal('bolNumber'),
+        totalSkidCount: parseInt(getVal('totalSkidCountInput')) || 0,
+        bolFile: document.getElementById('bolFile') ? document.getElementById('bolFile').files[0] : null,
+        packingListFile: document.getElementById('packingListFile') ? document.getElementById('packingListFile').files[0] : null
+      };
+    }
+
+    function lookupProject() {
+      const customerPOInput = document.getElementById('customerPO');
+      const customerPO = customerPOInput ? customerPOInput.value.trim() : '';
+      
+      const projectInput = document.getElementById('project');
+      if (!projectInput) return;
+
+      if (!customerPO) {
+        projectInput.value = '';
+        return;
+      }
+
+      // Show loading indicator
+      projectInput.value = 'Looking up...';
+      projectInput.classList.add('skeleton-pulse');
+
+      google.script.run
+        .withSuccessHandler(function(project) {
+          projectInput.classList.remove('skeleton-pulse');
+          projectInput.value = project || '';
+          if (!project) {
+            showAlert('Project not found for this PO number', 'warning');
+          }
+        })
+        .withFailureHandler(function(error) {
+          projectInput.classList.remove('skeleton-pulse');
+          projectInput.value = '';
+          showAlert('Error looking up project: ' + error.message, 'danger');
+        })
+        .lookupProjectFromPO(customerPO);
+    }
+    
+    function handleFileUpload(inputId, displayId) {
+      const input = document.getElementById(inputId);
+      const display = document.getElementById(displayId);
+      
+      if (input && display && input.files.length > 0) {
+        const fileName = input.files[0].name;
+        display.innerHTML = '✓ ' + fileName;
+        display.style.color = 'var(--success)';
+      }
+    }
+    
+    // =========================================================================
+    // TAB 2: ADD SKIDS
+    // =========================================================================
+    
+    function initializeSkidsFromCount() {
+      if (!formData.tab1 || !formData.tab1.totalSkidCount) return;
+      
+      const skidsContainer = document.getElementById('skidsContainer');
+      if (!skidsContainer) return;
+
+      // Only initialize if container is empty
+      if (skidsContainer.children.length === 0) {
+        skidCounter = 0;
+        // Create first skid
+        addSkid();
+      }
+
+      updateSkidCount();
+      updateSkidControls();
+      currentSkidView = 1;
+      showSkidView(1);
+    }
+    
+    function addSkid() {
+      const expectedCount = formData.tab1.totalSkidCount || 0;
+      const currentCount = document.querySelectorAll('#skidsContainer > .skid-card').length;
+      
+      if (expectedCount > 0 && currentCount >= expectedCount) {
+        showAlert(`You can only add ${expectedCount} skid(s) as specified in the Total Skid Count.`, 'warning');
+        return;
+      }
+      
+      skidCounter++;
+      const skidContainer = document.getElementById('skidsContainer');
+      
+      const skidDiv = document.createElement('div');
+      skidDiv.className = 'skid-card';
+      skidDiv.id = 'skid-' + skidCounter;
+      // Updated HTML structure for nicer layout
+      skidDiv.innerHTML = `
+        <div class="skid-header">
+          <div class="skid-title">
+            <span style="background:var(--primary); color:white; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.8rem;">${skidCounter}</span>
+            Skid #${skidCounter}
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="display:flex; align-items:center; gap:5px; background:#f3f4f6; padding:4px 8px; border-radius:4px;">
+              <label style="font-size: 0.8rem; margin: 0; color:var(--text-secondary); font-weight:600;">COPIES:</label>
+              <input type="number" id="duplicate-count-${skidCounter}" style="width: 50px; padding: 4px; border:1px solid #d1d5db; border-radius:4px; font-size:0.9rem;" min="1" max="50" value="1">
+            </div>
+            <button type="button" class="btn btn-secondary btn-small duplicate-skid-btn" onclick="duplicateSkidMultiple(${skidCounter})" title="Duplicate Skid">
+              📋 Duplicate
+            </button>
+            <button type="button" class="btn btn-danger btn-small remove-skid-btn" onclick="removeSkid(${skidCounter})" title="Remove Skid">
+              🗑️
+            </button>
+          </div>
+        </div>
+        
+        <div id="items-${skidCounter}" class="items-container">
+          <div class="item-row" data-item="1">
+            <div class="form-group" style="flex: 2;">
+              <label class="form-label required" for="fbpn-${skidCounter}-1">FBPN</label>
+              <input type="text" id="fbpn-${skidCounter}-1" class="form-input fbpn-input" placeholder="Enter FBPN">
+            </div>
+            <div class="form-group" style="flex: 1;">
+              <label class="form-label required" for="qty-${skidCounter}-1">Quantity</label>
+              <input type="number" id="qty-${skidCounter}-1" class="form-input qty-input" placeholder="Qty" min="1">
+            </div>
+            <div style="align-self:center; padding-bottom:2px;">
+               <button type="button" class="btn btn-danger btn-small" onclick="removeItem(this)" style="padding: 8px 12px;">✕</button>
+            </div>
+          </div>
+        </div>
+        
+        <div style="margin-top:15px; border-top:1px dashed #e5e7eb; padding-top:10px;">
+          <button type="button" class="btn btn-outline btn-small" onclick="addItemToSkid(${skidCounter})" style="width:100%;">
+            ➕ Add Another FBPN (Mixed Skid)
+          </button>
+        </div>
+      `;
+      
+      skidContainer.appendChild(skidDiv);
+
+      // Setup autocomplete for the initial FBPN input
+      const fbpnInput = document.getElementById(`fbpn-${skidCounter}-1`);
+      if (fbpnInput) {
+        setupFBPNAutocomplete(fbpnInput);
+      }
+
+      updateSkidCount();
+      updateSkidControls();
+      showSkidView(skidCounter);
+    }
+    
+    function addItemToSkid(skidNumber) {
+      const itemsContainer = document.getElementById('items-' + skidNumber);
+      const itemCount = itemsContainer.querySelectorAll('.item-row').length + 1;
+
+      const itemDiv = document.createElement('div');
+      itemDiv.className = 'item-row';
+      itemDiv.setAttribute('data-item', itemCount);
+      itemDiv.innerHTML = `
+        <div class="form-group" style="flex: 2;">
+          <label class="form-label required" for="fbpn-${skidNumber}-${itemCount}">FBPN</label>
+          <input type="text" id="fbpn-${skidNumber}-${itemCount}" class="form-input fbpn-input" placeholder="Enter FBPN">
+        </div>
+        <div class="form-group" style="flex: 1;">
+          <label class="form-label required" for="qty-${skidNumber}-${itemCount}">Quantity</label>
+          <input type="number" id="qty-${skidNumber}-${itemCount}" class="form-input qty-input" placeholder="Qty" min="1">
+        </div>
+        <div style="align-self:center; padding-bottom:2px;">
+           <button type="button" class="btn btn-danger btn-small" onclick="removeItem(this)" style="padding: 8px 12px;">✕</button>
+        </div>
+      `;
+
+      itemsContainer.appendChild(itemDiv);
+
+      // Setup autocomplete for the new FBPN input
+      const fbpnInput = document.getElementById(`fbpn-${skidNumber}-${itemCount}`);
+      if (fbpnInput) {
+        setupFBPNAutocomplete(fbpnInput);
+      }
+    }
+    
+    function duplicateSkidMultiple(skidNumber) {
+      const duplicateCountInput = document.getElementById('duplicate-count-' + skidNumber);
+      const duplicateCount = parseInt(duplicateCountInput.value) || 1;
+
+      if (duplicateCount < 1 || duplicateCount > 50) {
+        showAlert('Please enter a number between 1 and 50 for duplicates.', 'warning');
+        return;
+      }
+
+      const expectedCount = formData.tab1.totalSkidCount;
+      const currentCount = document.querySelectorAll('#skidsContainer > .skid-card').length;
+      const spaceAvailable = expectedCount - currentCount;
+
+      if (duplicateCount > spaceAvailable) {
+        showAlert(`You can only add ${spaceAvailable} more skid(s). You specified ${expectedCount} total skids.`, 'warning');
+        return;
+      }
+
+      // Duplicate the skid the specified number of times
+      for (let i = 0; i < duplicateCount; i++) {
+        duplicateSkid(skidNumber);
+      }
+    }
+
+    function duplicateSkid(skidNumber) {
+      const expectedCount = formData.tab1.totalSkidCount;
+      const currentCount = document.querySelectorAll('#skidsContainer > .skid-card').length;
+
+      if (currentCount >= expectedCount) {
+        return; // Silently return when called from loop
+      }
+
+      const originalSkid = document.getElementById('skid-' + skidNumber);
+      const items = originalSkid.querySelectorAll('.item-row');
+      
+      // Create new skid
+      skidCounter++;
+      const skidContainer = document.getElementById('skidsContainer');
+      
+      const skidDiv = document.createElement('div');
+      skidDiv.className = 'skid-card';
+      skidDiv.id = 'skid-' + skidCounter;
+      // Consistent HTML structure for duplicated skid
+      skidDiv.innerHTML = `
+        <div class="skid-header">
+          <div class="skid-title">
+            <span style="background:var(--primary); color:white; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.8rem;">${skidCounter}</span>
+            Skid #${skidCounter} <span class="badge status-pending" style="font-size: 0.7rem; margin-left: 8px;">Copy</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="display:flex; align-items:center; gap:5px; background:#f3f4f6; padding:4px 8px; border-radius:4px;">
+              <label style="font-size: 0.8rem; margin: 0; color:var(--text-secondary); font-weight:600;">COPIES:</label>
+              <input type="number" id="duplicate-count-${skidCounter}" style="width: 50px; padding: 4px; border:1px solid #d1d5db; border-radius:4px; font-size:0.9rem;" min="1" max="50" value="1">
+            </div>
+            <button type="button" class="btn btn-secondary btn-small duplicate-skid-btn" onclick="duplicateSkidMultiple(${skidCounter})" title="Duplicate Skid">
+              📋 Duplicate
+            </button>
+            <button type="button" class="btn btn-danger btn-small remove-skid-btn" onclick="removeSkid(${skidCounter})" title="Remove Skid">
+              🗑️
+            </button>
+          </div>
+        </div>
+        <div id="items-${skidCounter}" class="items-container"></div>
+        <div style="margin-top:15px; border-top:1px dashed #e5e7eb; padding-top:10px;">
+          <button type="button" class="btn btn-outline btn-small" onclick="addItemToSkid(${skidCounter})" style="width:100%;">
+            ➕ Add Another FBPN (Mixed Skid)
+          </button>
+        </div>
+      `;
+      
+      skidContainer.appendChild(skidDiv);
+      
+      // Copy items from original skid
+      const newItemsContainer = document.getElementById('items-' + skidCounter);
+      items.forEach((item, index) => {
+        const fbpn = item.querySelector('.fbpn-input').value;
+        const qty = item.querySelector('.qty-input').value;
+
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'item-row';
+        itemDiv.setAttribute('data-item', index + 1);
+        itemDiv.innerHTML = `
+          <div class="form-group" style="flex: 2;">
+            <label class="form-label required" for="fbpn-${skidCounter}-${index + 1}">FBPN</label>
+            <input type="text" id="fbpn-${skidCounter}-${index + 1}" class="form-input fbpn-input" placeholder="Enter FBPN" value="${fbpn}">
+          </div>
+          <div class="form-group" style="flex: 1;">
+            <label class="form-label required" for="qty-${skidCounter}-${index + 1}">Quantity</label>
+            <input type="number" id="qty-${skidCounter}-${index + 1}" class="form-input qty-input" placeholder="Qty" min="1" value="${qty}">
+          </div>
+          <div style="align-self:center; padding-bottom:2px;">
+             <button type="button" class="btn btn-danger btn-small" onclick="removeItem(this)" style="padding: 8px 12px;">✕</button>
+          </div>
+        `;
+
+        newItemsContainer.appendChild(itemDiv);
+
+        // Setup autocomplete for the duplicated FBPN input
+        const fbpnInput = document.getElementById(`fbpn-${skidCounter}-${index + 1}`);
+        if (fbpnInput) {
+          setupFBPNAutocomplete(fbpnInput);
+        }
+      });
+
+      updateSkidCount();
+      updateSkidControls();
+      showSkidView(skidCounter);
+    }
+
+    function removeSkid(skidNumber) {
+      const currentCount = document.querySelectorAll('#skidsContainer > .skid-card').length;
+      const expectedCount = formData.tab1.totalSkidCount;
+      
+      if (currentCount <= expectedCount) {
+        showAlert(`You must have exactly ${expectedCount} skid(s). Add more skids before removing this one.`, 'warning');
+        return;
+      }
+      
+      if (confirm('Are you sure you want to remove this skid?')) {
+        const skid = document.getElementById('skid-' + skidNumber);
+        if(skid) skid.remove();
+        updateSkidCount();
+        renumberSkids();
+        updateSkidControls();
+      }
+    }
+    
+    function removeItem(button) {
+      const itemRow = button.closest('.item-row');
+      const itemsContainer = itemRow.parentElement;
+      
+      // Don't allow removing the last item
+      if (itemsContainer.querySelectorAll('.item-row').length === 1) {
+        showAlert('Each skid must have at least one FBPN', 'warning');
+        return;
+      }
+      
+      itemRow.remove();
+    }
+    
+    function renumberSkids() {
+      const skids = document.querySelectorAll('#skidsContainer > .skid-card');
+      skids.forEach((skid, index) => {
+        const headerTitle = skid.querySelector('.skid-title');
+        // Simple re-render of the title part to keep it clean
+        if (headerTitle) {
+          headerTitle.innerHTML = `
+              <span style="background:var(--primary); color:white; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.8rem;">${index + 1}</span>
+              Skid #${index + 1}
+          `;
+        }
+      });
+    }
+    
+    function updateSkidCount() {
+      const currentCount = document.querySelectorAll('#skidsContainer > .skid-card').length;
+      const expectedCount = formData.tab1.totalSkidCount || 0;
+      
+      const countDisplay = document.getElementById('totalSkidCount');
+      if (countDisplay) {
+        countDisplay.textContent = `${currentCount} / ${expectedCount}`;
+        
+        // Color code based on match
+        countDisplay.className = 'badge';
+        if (currentCount === expectedCount) {
+          countDisplay.classList.add('status-complete');
+        } else if (currentCount < expectedCount) {
+          countDisplay.classList.add('status-warning');
+        } else {
+          countDisplay.classList.add('status-danger');
+        }
+      }
+    }
+    
+    function updateSkidControls() {
+      const currentCount = document.querySelectorAll('#skidsContainer > .skid-card').length;
+      const expectedCount = formData.tab1.totalSkidCount || 0;
+
+      // Enable/disable Add New Skid button
+      const addSkidBtn = document.getElementById('addSkidBtn');
+      if (addSkidBtn) {
+        if (currentCount >= expectedCount) {
+          addSkidBtn.disabled = true;
+          addSkidBtn.textContent = "All Skids Added";
+          addSkidBtn.classList.remove('btn-primary');
+          addSkidBtn.classList.add('btn-secondary');
+        } else {
+          addSkidBtn.disabled = false;
+          addSkidBtn.textContent = "➕ Add New Skid";
+          addSkidBtn.classList.add('btn-primary');
+          addSkidBtn.classList.remove('btn-secondary');
+        }
+      }
+
+      // Enable/disable duplicate buttons
+      const duplicateBtns = document.querySelectorAll('.duplicate-skid-btn');
+      duplicateBtns.forEach(btn => {
+        btn.disabled = (currentCount >= expectedCount);
+      });
+
+      // Update remove button states
+      const removeBtns = document.querySelectorAll('.remove-skid-btn');
+      removeBtns.forEach(btn => {
+        btn.disabled = (currentCount <= expectedCount);
+      });
+    }
+
+    // =========================================================================
+    // SKID NAVIGATION (One at a time)
+    // =========================================================================
+
+    function showSkidView(skidIndex) {
+      const allSkids = document.querySelectorAll('#skidsContainer > .skid-card');
+      const totalSkids = allSkids.length;
+
+      if (skidIndex < 1) skidIndex = 1;
+      if (skidIndex > totalSkids) skidIndex = totalSkids;
+
+      currentSkidView = skidIndex;
+
+      // Hide all skids
+      allSkids.forEach(skid => {
+        skid.style.display = 'none';
+      });
+
+      // Show the current skid
+      if (allSkids[skidIndex - 1]) {
+        allSkids[skidIndex - 1].style.display = 'block';
+      }
+
+      // Update navigation controls
+      updateSkidNavigation();
+    }
+
+    function prevSkid() {
+      if (currentSkidView > 1) {
+        showSkidView(currentSkidView - 1);
+      }
+    }
+
+    function nextSkid() {
+      const totalSkids = document.querySelectorAll('#skidsContainer > .skid-card').length;
+      if (currentSkidView < totalSkids) {
+        showSkidView(currentSkidView + 1);
+      }
+    }
+
+    function updateSkidNavigation() {
+      const totalSkids = document.querySelectorAll('#skidsContainer > .skid-card').length;
+      const prevBtn = document.getElementById('prevSkidBtn');
+      const nextBtn = document.getElementById('nextSkidBtn');
+      const skidIndicator = document.getElementById('skidViewIndicator');
+
+      if (skidIndicator) {
+        skidIndicator.textContent = `Viewing Skid ${currentSkidView} of ${totalSkids}`;
+      }
+
+      if (prevBtn) {
+        prevBtn.disabled = currentSkidView <= 1;
+      }
+
+      if (nextBtn) {
+        nextBtn.disabled = currentSkidView >= totalSkids;
+      }
+    }
+    
+    function validateTab2() {
+      const currentCount = document.querySelectorAll('#skidsContainer > .skid-card').length;
+      const expectedCount = formData.tab1.totalSkidCount;
+      
+      if (currentCount !== expectedCount) {
+        showAlert(`You must have exactly ${expectedCount} skid(s). Current count: ${currentCount}`, 'danger');
+        window.scrollTo(0,0);
+        return false;
+      }
+      
+      const skids = document.querySelectorAll('#skidsContainer > .skid-card');
+      
+      if (skids.length === 0) {
+        showAlert('Please add at least one skid', 'danger');
+        window.scrollTo(0,0);
+        return false;
+      }
+      
+      let isValid = true;
+      skids.forEach(skid => {
+        const items = skid.querySelectorAll('.item-row');
+        items.forEach(item => {
+          const fbpn = item.querySelector('.fbpn-input');
+          const qty = item.querySelector('.qty-input');
+          
+          if (fbpn && !fbpn.value.trim()) {
+            fbpn.style.borderColor = 'var(--danger)';
+            isValid = false;
+          } else if (fbpn) {
+            fbpn.style.borderColor = 'var(--border-color)';
+          }
+          
+          if (qty && (!qty.value || qty.value < 1)) {
+            qty.style.borderColor = 'var(--danger)';
+            isValid = false;
+          } else if (qty) {
+            qty.style.borderColor = 'var(--border-color)';
+          }
+        });
+      });
+      
+      if (!isValid) {
+        showAlert('Please fill in all FBPN and Quantity fields', 'danger');
+        window.scrollTo(0,0);
+      }
+      
+      return isValid;
+    }
+    
+    function saveTab2Data() {
+      formData.skids = [];
+      const skids = document.querySelectorAll('#skidsContainer > .skid-card');
+      
+      skids.forEach((skid, skidIndex) => {
+        const items = skid.querySelectorAll('.item-row');
+        const skidItems = [];
+        
+        items.forEach(item => {
+          const fbpnEl = item.querySelector('.fbpn-input');
+          const qtyEl = item.querySelector('.qty-input');
+          const fbpn = fbpnEl ? fbpnEl.value.trim() : '';
+          const qty = qtyEl ? parseInt(qtyEl.value) : 0;
+          
+          skidItems.push({ fbpn, qty });
+        });
+        
+        formData.skids.push({
+          skidNumber: skidIndex + 1,
+          items: skidItems,
+          isMixed: skidItems.length > 1
+        });
+      });
+    }
+    
+    // =========================================================================
+    // TAB 3: REVIEW
+    // =========================================================================
+    
+    function setTextContent(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
+    }
+
+    function populateReview() {
+      // Validate that Tab 1 data exists to prevent errors
+      if (!formData.tab1 || !formData.tab1.deliveryDate) {
+        throw new Error("Missing Basic Info from Tab 1.");
+      }
+
+      // Basic Info using the new Review Grid Layout
+      setTextContent('review-date', formData.tab1.deliveryDate);
+      setTextContent('review-warehouse', formData.tab1.warehouse);
+      setTextContent('review-push', formData.tab1.pushNumber);
+      setTextContent('review-po', formData.tab1.customerPO);
+      setTextContent('review-project', formData.tab1.project);
+      setTextContent('review-carrier', formData.tab1.carrier);
+      setTextContent('review-manufacturer', formData.tab1.manufacturer);
+      setTextContent('review-bol', formData.tab1.bolNumber);
+      setTextContent('review-expected-skids', formData.tab1.totalSkidCount);
+      setTextContent('review-bolfile', formData.tab1.bolFile ? formData.tab1.bolFile.name : 'No file uploaded');
+      setTextContent('review-packinglist', formData.tab1.packingListFile ? formData.tab1.packingListFile.name : 'No file uploaded');
+      
+      // Skids Table
+      const tbody = document.getElementById('review-skids-tbody');
+      if (tbody) {
+        tbody.innerHTML = '';
+        formData.skids.forEach((skid, index) => {
+          skid.items.forEach((item, itemIndex) => {
+            const row = tbody.insertRow();
+            
+            if (itemIndex === 0) {
+              const skidCell = row.insertCell(0);
+              skidCell.textContent = `Skid ${index + 1}`;
+              skidCell.rowSpan = skid.items.length;
+              skidCell.style.fontWeight = '600';
+              skidCell.style.color = 'var(--primary)';
+              skidCell.style.backgroundColor = '#f9fafb';
+              skidCell.style.borderRight = '1px solid #e5e7eb';
+            }
+
+            row.insertCell(itemIndex === 0 ? 1 : 0).textContent = item.fbpn;
+            row.insertCell(itemIndex === 0 ? 2 : 1).textContent = item.qty;
+
+            if (itemIndex === 0) {
+              const mixedCell = row.insertCell(3);
+              mixedCell.innerHTML = skid.isMixed ? '<span class="badge status-warning">Yes</span>' : '<span class="badge status-pending">No</span>';
+              mixedCell.rowSpan = skid.items.length;
+              mixedCell.style.textAlign = 'center';
+              mixedCell.style.borderLeft = '1px solid #e5e7eb';
+            }
+          });
+        });
+      }
+      
+      // Summary
+      const totalSkids = formData.skids.length;
+      const totalItems = formData.skids.reduce((sum, skid) => sum + skid.items.reduce((s, item) => s + item.qty, 0), 0);
+      const uniqueFBPNs = new Set(formData.skids.flatMap(skid => skid.items.map(item => item.fbpn))).size;
+      
+      setTextContent('review-total-skids', totalSkids);
+      setTextContent('review-total-items', totalItems);
+      setTextContent('review-unique-fbpns', uniqueFBPNs);
+    }
+    
+    // =========================================================================
+    // FORM SUBMISSION
+    // =========================================================================
+    
+    function submitForm() {
+      showLoading(true, 'Processing Inbound Delivery...');
+      
+      // Convert files to base64
+      const filePromises = [];
+      
+      if (formData.tab1.bolFile) {
+        filePromises.push(fileToBase64(formData.tab1.bolFile, 'bol'));
+      }
+      
+      if (formData.tab1.packingListFile) {
+        filePromises.push(fileToBase64(formData.tab1.packingListFile, 'packingList'));
+      }
+      
+      Promise.all(filePromises).then(files => {
+        const filesData = {};
+        files.forEach(file => {
+          filesData[file.type] = {
+            name: file.name,
+            data: file.data,
+            mimeType: file.mimeType
+          };
+        });
+        
+        const submissionData = {
+          tab1: formData.tab1,
+          skids: formData.skids,
+          files: filesData
+        };
+        
+        // Remove file objects (can't be stringified)
+        delete submissionData.tab1.bolFile;
+        delete submissionData.tab1.packingListFile;
+        
+        google.script.run
+          .withSuccessHandler(onSubmitSuccess)
+          .withFailureHandler(onSubmitFailure)
+          .processInboundSubmission(submissionData);
+      });
+    }
+    
+    function fileToBase64(file, type) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const base64 = e.target.result.split(',')[1];
+          resolve({
+            type: type,
+            name: file.name,
+            data: base64,
+            mimeType: file.type
+          });
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+    
+    function onSubmitSuccess(result) {
+      showLoading(false);
+
+      if (result.success) {
+        const htmlUrl = result.labelHtmlUrl;
+        const pdfUrl = result.labelPdfUrl;
+
+        // 1. Open HTML immediately
+        const winHtml = window.open(htmlUrl, '_blank');
+
+        // 2. Open PDF with a delay
+        setTimeout(() => {
+          const winPdf = window.open(pdfUrl, '_blank');
+          
+          // 3. Fallback if blocked
+          if (!winHtml || !winPdf) {
+            const tab3 = document.getElementById('tab3');
+            // Clean up existing content first to avoid duplicates if called multiple times
+            const existingAlert = tab3.querySelector('.popup-alert');
+            if (existingAlert) existingAlert.remove();
+
+            const fallbackHtml = `
+              <div class="alert alert-warning popup-alert" style="text-align:center; margin-bottom:20px;">
+                <strong>Popups Blocked!</strong> Click below to access your labels:
+                <div style="margin-top: 15px; display: flex; gap: 10px; justify-content: center;">
+                  <a href="${htmlUrl}" target="_blank" class="btn btn-primary">Open HTML</a>
+                  <a href="${pdfUrl}" target="_blank" class="btn btn-success">Download PDF</a>
+                </div>
+              </div>
+            `;
+            tab3.insertAdjacentHTML('afterbegin', fallbackHtml);
+          } else {
+            alert('✅ Inbound delivery processed! Labels have been opened in new tabs.');
+            google.script.host.close();
+          }
+        }, 600);
+      }
+    }
+    
+    function onSubmitFailure(error) {
+      showLoading(false);
+      showAlert('Error: ' + error.message, 'danger');
+      console.error(error);
+    }
+    
+    // =========================================================================
+    // UTILITY FUNCTIONS
+    // =========================================================================
+    
+    function showAlert(message, type) {
+      const alertDiv = document.createElement('div');
+      alertDiv.className = `alert alert-${type}`;
+      alertDiv.textContent = message;
+      
+      const container = document.querySelector('.tab-content.active');
+      if (container) {
+        container.insertBefore(alertDiv, container.firstChild);
+      } else {
+        // Fallback if no active tab found (edge case)
+        document.body.insertBefore(alertDiv, document.body.firstChild);
+      }
+      
+      setTimeout(() => {
+        alertDiv.remove();
+      }, 5000);
+    }
+    
+    function showLoading(show, message = 'Processing...') {
+      const overlay = document.getElementById('loadingOverlay');
+      const text = document.getElementById('loadingText');
+      if (text) text.textContent = message;
+      
+      if (show) {
+        overlay.classList.add('active');
+      } else {
+        overlay.classList.remove('active');
+      }
+    }
+    
+    // Load FBPN list from Item_Master
+    function loadFBPNList() {
+      google.script.run
+        .withSuccessHandler(function(list) {
+          fbpnList = list;
+          console.log('FBPN list loaded:', fbpnList.length, 'items');
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error loading FBPN list:', error);
+          showAlert('Could not load FBPN list: ' + error.message, 'warning');
+        })
+        .getFBPNList();
+    }
+
+    // Setup autocomplete for FBPN input
+    function setupFBPNAutocomplete(inputElement) {
+      let autocompleteDiv = null;
+
+      inputElement.addEventListener('input', function() {
+        const value = this.value.trim().toUpperCase();
+
+        // Remove existing autocomplete
+        if (autocompleteDiv) {
+          autocompleteDiv.remove();
+          autocompleteDiv = null;
+        }
+
+        if (!value || fbpnList.length === 0) return;
+
+        // Filter FBPN list
+        const filtered = fbpnList.filter(fbpn =>
+          fbpn.toUpperCase().includes(value)
+        ).slice(0, 10);  // Limit to 10 results
+
+        if (filtered.length === 0) return;
+
+        // Create autocomplete dropdown
+        autocompleteDiv = document.createElement('div');
+        autocompleteDiv.className = 'autocomplete-dropdown';
+        autocompleteDiv.style.cssText = `
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          background: #ffffff;
+          border: 1px solid #d1d5db;
+          border-top: none;
+          border-radius: 0 0 4px 4px;
+          max-height: 200px;
+          overflow-y: auto;
+          z-index: 1000;
+          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        `;
+
+        filtered.forEach(fbpn => {
+          const option = document.createElement('div');
+          option.textContent = fbpn;
+          option.style.cssText = `
+            padding: 8px 12px;
+            cursor: pointer;
+            color: var(--text-main);
+            font-size: 0.9rem;
+          `;
+          option.addEventListener('mouseover', function() {
+            this.style.background = '#f3f4f6';
+          });
+          option.addEventListener('mouseout', function() {
+            this.style.background = 'transparent';
+          });
+          option.addEventListener('click', function() {
+            inputElement.value = fbpn;
+            autocompleteDiv.remove();
+            autocompleteDiv = null;
+          });
+          autocompleteDiv.appendChild(option);
+        });
+
+        // Position relative to input
+        const parent = inputElement.parentElement;
+        parent.style.position = 'relative';
+        parent.appendChild(autocompleteDiv);
+      });
+
+      // Close autocomplete when clicking outside
+      document.addEventListener('click', function(e) {
+        if (autocompleteDiv && !inputElement.contains(e.target) && !autocompleteDiv.contains(e.target)) {
+          autocompleteDiv.remove();
+          autocompleteDiv = null;
+        }
+      });
+    }
+
+    // Initialize on load
+    window.onload = function() {
+      showTab(1);
+      updateNavigationButtons();
+      loadFBPNList();  // Load FBPN list on initialization
+
+      // Set today's date as default
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('deliveryDate').value = today;
+    };
+  </script>
+</head>
+<body>
+  <div class="modal-container">
+    <!-- Header -->
+    <div class="modal-header">
+      <h1>Inbound Delivery Receiving Form</h1>
+    </div>
+    
+    <!-- Tab Navigation -->
+    <div class="tab-navigation">
+      <button class="tab-button active" onclick="showTab(1)">1. Basic Info</button>
+      <button class="tab-button" onclick="showTab(2)">2. Add Skids</button>
+      <button class="tab-button" onclick="showTab(3)">3. Review & Submit</button>
+    </div>
+    
+    <!-- Tab 1: Basic Info -->
+    <div id="tab1" class="tab-content active">
+      <div class="form-section">
+        <h2 class="form-section-title">Delivery Information</h2>
+        
+        <!-- Row 1: Date & Warehouse -->
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label required" for="deliveryDate">Delivery Date</label>
+            <input type="date" id="deliveryDate" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label required" for="warehouse">Warehouse</label>
+            <select id="warehouse" class="form-select">
+              <option value="">Select Warehouse</option>
+              <option value="CVD">CVD</option>
+              <option value="HRR">HRR</option>
+            </select>
+          </div>
+        </div>
+        
+        <!-- Row 2: Push & PO -->
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label required" for="pushNumber">Push Number</label>
+            <input type="text" id="pushNumber" class="form-input" placeholder="Enter push number">
+          </div>
+          <div class="form-group">
+            <label class="form-label required" for="customerPO">Customer PO Number</label>
+            <input type="text" id="customerPO" class="form-input" placeholder="Enter PO number" onchange="lookupProject()">
+          </div>
+        </div>
+
+        <!-- Row 3: Project (Full Width for clarity) -->
+        <div class="form-grid">
+          <div class="form-group" style="grid-column: span 2;">
+            <label class="form-label required" for="project">Project</label>
+            <input type="text" id="project" class="form-input" placeholder="Auto-populated from PO" readonly style="background-color: #f9fafb;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Project is auto-populated based on Customer PO Number</div>
+          </div>
+        </div>
+        
+        <!-- Row 4: Carrier & Manufacturer -->
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label required" for="carrier">Carrier</label>
+            <input type="text" id="carrier" class="form-input" placeholder="Enter carrier name">
+          </div>
+          <div class="form-group">
+            <label class="form-label required" for="manufacturer">Manufacturer</label>
+            <select id="manufacturer" class="form-select">
+              <option value="">Select Manufacturer</option>
+              <option value="CORNING OPTICAL">CORNING OPTICAL</option>
+              <option value="PANDUIT">PANDUIT</option>
+              <option value="SUMITOMO">SUMITOMO</option>
+              <option value="ANIXTER">ANIXTER</option>
+              <option value="AMPHENOL">AMPHENOL</option>
+              <option value="SCHNEIDER">SCHNEIDER</option>
+              <option value="WESCO">WESCO</option>
+              <option value="TRM">TRM</option>
+              <option value="AFL">AFL</option>
+              <option value="HFCl">HFCL</option>
+            </select>
+          </div>
+        </div>
+        
+        <!-- Row 5: BOL & Skid Count -->
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label required" for="bolNumber">BOL Number</label>
+            <input type="text" id="bolNumber" class="form-input" placeholder="Enter BOL number">
+          </div>
+          <div class="form-group">
+            <label class="form-label required" for="totalSkidCountInput">Total Skid Count</label>
+            <input type="number" id="totalSkidCountInput" class="form-input" placeholder="Enter total number of skids" min="1">
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Number of physical skids expected</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- File Upload Section -->
+      <div class="form-section">
+        <h2 class="form-section-title">Documents</h2>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label" for="bolFile">BOL Document (PDF)</label>
+            <input type="file" id="bolFile" class="form-input" accept=".pdf" onchange="handleFileUpload('bolFile', 'bolFileName')">
+            <div id="bolFileName" class="file-status"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="packingListFile">Packing List (PDF)</label>
+            <input type="file" id="packingListFile" class="form-input" accept=".pdf" onchange="handleFileUpload('packingListFile', 'packingListFileName')">
+            <div id="packingListFileName" class="file-status"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Tab 2: Add Skids -->
+    <div id="tab2" class="tab-content">
+      <div class="alert alert-info">
+        <strong>Instructions:</strong> You must add exactly <strong id="expectedSkidCountDisplay">0</strong> skid(s).
+      </div>
+      
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 class="form-section-title" style="margin: 0; border-bottom: none;">Skid Details</h2>
+        <div>
+          <span style="color:var(--text-secondary); font-size: 0.9rem; font-weight:500; margin-right:8px;">Progress:</span>
+          <span id="totalSkidCount" class="badge">0 / 0</span>
+        </div>
+      </div>
+
+      <!-- Skid Navigation Controls -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 12px; background-color: white; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+        <button type="button" id="prevSkidBtn" class="btn btn-secondary btn-small" onclick="prevSkid()">
+          ← Previous
+        </button>
+        <span id="skidViewIndicator" style="font-weight: 700; font-size: 0.95rem; color: var(--text-main);">Viewing Skid 1 of 1</span>
+        <button type="button" id="nextSkidBtn" class="btn btn-secondary btn-small" onclick="nextSkid()">
+          Next →
+        </button>
+      </div>
+
+      <div id="skidsContainer">
+        <!-- Skids will be dynamically generated here -->
+      </div>
+      
+      <div style="text-align: center; margin-top: 24px;">
+        <button type="button" id="addSkidBtn" class="btn btn-primary" onclick="addSkid()">
+          ➕ Add New Skid
+        </button>
+      </div>
+    </div>
+    
+    <!-- Tab 3: Review & Submit -->
+    <div id="tab3" class="tab-content">
+      <div class="alert alert-info">
+        <strong>Review Submission:</strong> Please verify all details before submitting.
+      </div>
+      
+      <div class="form-section">
+        <h3 class="form-section-title">Delivery Details</h3>
+        <div class="review-grid">
+          <!-- Row 1 -->
+          <div class="review-item">
+            <span class="review-label">Date</span>
+            <span class="review-value" id="review-date"></span>
+          </div>
+          <div class="review-item">
+            <span class="review-label">Warehouse</span>
+            <span class="review-value" id="review-warehouse"></span>
+          </div>
+          <!-- Row 2 -->
+          <div class="review-item">
+            <span class="review-label">Push #</span>
+            <span class="review-value" id="review-push"></span>
+          </div>
+          <div class="review-item">
+            <span class="review-label">PO #</span>
+            <span class="review-value" id="review-po"></span>
+          </div>
+          <!-- Row 3 -->
+          <div class="review-item">
+            <span class="review-label">Project</span>
+            <span class="review-value" id="review-project"></span>
+          </div>
+          <div class="review-item">
+            <span class="review-label">Carrier</span>
+            <span class="review-value" id="review-carrier"></span>
+          </div>
+          <!-- Row 4 -->
+          <div class="review-item">
+            <span class="review-label">Manufacturer</span>
+            <span class="review-value" id="review-manufacturer"></span>
+          </div>
+          <div class="review-item">
+            <span class="review-label">BOL #</span>
+            <span class="review-value" id="review-bol"></span>
+          </div>
+          <!-- Row 5 -->
+          <div class="review-item">
+            <span class="review-label">BOL File</span>
+            <span class="review-value" id="review-bolfile" style="font-size:0.85rem; overflow:hidden; text-overflow:ellipsis;"></span>
+          </div>
+          <div class="review-item">
+            <span class="review-label">Packing List</span>
+            <span class="review-value" id="review-packinglist" style="font-size:0.85rem; overflow:hidden; text-overflow:ellipsis;"></span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="form-section">
+        <h3 class="form-section-title">Skid Manifest</h3>
+        <div style="overflow-x: auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 15%">Skid ID</th>
+                <th style="width: 45%">FBPN</th>
+                <th style="width: 25%">Quantity</th>
+                <th style="width: 15%; text-align:center;">Type</th>
+              </tr>
+            </thead>
+            <tbody id="review-skids-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      
+      <div class="form-grid three-col" style="margin-bottom:0;">
+        <div class="summary-card">
+          <div class="summary-label">Total Skids</div>
+          <div class="summary-value" id="review-total-skids">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Total Items</div>
+          <div class="summary-value" id="review-total-items">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Unique FBPNs</div>
+          <div class="summary-value" id="review-unique-fbpns">0</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Navigation Buttons -->
+    <div class="button-group">
+      <button type="button" id="prevBtn" class="btn btn-secondary" onclick="prevTab()">
+        Back
+      </button>
+      <button type="button" id="nextBtn" class="btn btn-primary" onclick="nextTab()">
+        Continue
+      </button>
+      <button type="button" id="submitBtn" class="btn btn-success" onclick="submitForm()" style="display: none;">
+        Submit Delivery
+      </button>
+    </div>
+  </div>
+  
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <div id="loadingText" class="loading-text">Processing...</div>
+  </div>
+  
+  <script>
+    // Initial setup listener
+    document.addEventListener('DOMContentLoaded', function() {
+      const tab2Button = document.querySelector('[onclick="showTab(2)"]');
+      if (tab2Button) {
+        tab2Button.addEventListener('click', function() {
+          if (formData.tab1 && formData.tab1.totalSkidCount) {
+            document.getElementById('expectedSkidCountDisplay').textContent = formData.tab1.totalSkidCount;
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>
