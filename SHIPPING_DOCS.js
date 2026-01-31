@@ -958,7 +958,7 @@ function writeOutboundLogEntry(ss, data) {
     }
   }
 
-  sheet.appendRow([
+  const row = [
     data.date || new Date(),
     data.orderNumber,
     data.taskNumber,
@@ -972,7 +972,11 @@ function writeOutboundLogEntry(ss, data) {
     data.binCode,
     data.skidId || '',
     data.sku || ''
-  ]);
+  ];
+
+  // Insert at row 3 (headers row 1, spacer row 2, data starts row 3)
+  sheet.insertRowsBefore(3, 1);
+  sheet.getRange(3, 1, 1, row.length).setValues([row]);
 }
 
 function updateAllocationStatus(ss, orderNumber, fbpn, newStatus) {

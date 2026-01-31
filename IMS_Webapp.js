@@ -1,6 +1,6 @@
 // ============================================================================
-// IMS_WEBAPP.GS (LIBRARY) - WebApp API + Auth Context + Data Endpoints
-// Intended to be added to IMS_LIB and called by IMS_Shell webapp forwarders.
+// IMS_WEBAPP.GS - WebApp API + Auth Context + Data Endpoints
+// Provides webapp functions called by IMS_Config.js
 // ============================================================================
 
 /**
@@ -106,8 +106,8 @@ function imsw_buildPermissionsFromLevel_(accessLevel) {
 // ============================================================================
 
 /**
- * Must match IMS_Shell expectation:
- *   IMS_LIB.getUserContextForWebApp(ssId)
+ * Get user context for WebApp authentication.
+ * Called by getUserContext() in IMS_Config.js
  */
 function getUserContextForWebApp(ssId) {
   try {

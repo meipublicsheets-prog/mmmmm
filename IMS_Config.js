@@ -548,9 +548,7 @@ function onOpen(e) {
 }
 
 function onEdit(e) {
-  if (typeof IMS_LIB !== 'undefined' && typeof IMS_LIB.onEdit === 'function') {
-    return IMS_LIB.onEdit(e);
-  }
+  // onEdit trigger - add custom logic here if needed
 }
 
 function doGet(e) {
@@ -672,123 +670,22 @@ function openInboundSkidLabelModal() {
 }
 
 // ----------------------------------------------------------------------------
-// LIBRARY STUBS / WRAPPERS
+// SHELL WRAPPER FUNCTIONS
+// Note: Most functions are implemented in their respective modules:
+// - IMS_Inbound.js: Inbound processing, labels, manufacturers, FBPNs
+// - CustomerOrderBackend.js: Orders, companies, projects
+// - SHIPPING_DOCS.js: Pick tickets, TOC, packing lists
+// - BinLookup.js: Bin search, details, history
+// - BinUpdate.js: Inventory batch operations
+// - CycleCount.js: Cycle count functions
+// - IMS_Inbound_Manager.js: Inbound undo, search, label regeneration
+// - ReportGenerator.js: Report generation
 // ----------------------------------------------------------------------------
-function generateLabelsForAllPastInbounds() {
-  return IMS_LIB.generateLabelsForAllPastInbounds();
-}
 
 function shell_generateLabelsForAllPastInbounds(startDate, endDate) {
   if (!startDate) throw new Error('startDate is required');
-  return IMS_LIB.generateLabelsForAllPastInbounds(startDate, endDate || startDate);
+  return generateLabelsForAllPastInbounds(startDate, endDate || startDate);
 }
-
-// Inbound Functions
-function lookupProjectFromPO(customerPO) { return IMS_LIB.lookupProjectFromPO(customerPO); }
-
-function processInboundSubmission(payload) {
-  if (!payload) payload = {};
-  if (!payload.options) payload.options = {};
-
-  // Force labels ON (required)
-  payload.options.generateLabels = true;
-
-  const res = IMS_LIB.processInboundSubmission(payload);
-
-  // Normalize for InboundModal.html (expects labelPdfUrl)
-  if (res && res.success) {
-    const pdfUrl =
-      (res.labelPdfUrl) ||
-      (res.labelResult && (res.labelResult.labelFileUrl || res.labelResult.pdfUrl)) ||
-      '';
-
-    const htmlUrl =
-      (res.labelHtmlUrl) ||
-      (res.labelResult && (res.labelResult.labelHtmlUrl || res.labelResult.htmlUrl)) ||
-      '';
-
-    res.labelPdfUrl = String(pdfUrl || '').trim();
-    res.labelHtmlUrl = String(htmlUrl || '').trim();
-  }
-
-  return res;
-}
-
-function generateSkidLabelsHtml(labelData) {
-  return IMS_LIB.generateSkidLabelsHtml_(labelData);
-}
-
-function getManufacturers() { return IMS_LIB.getManufacturers(); }
-function saveLabelsToDrive(html) { return IMS_LIB.saveLabelsToDrive(html); }
-function processPendingOrderUploads() { return IMS_LIB.processPendingOrderUploads(); }
-
-// Other Library Functions
-function getCompanies() { return IMS_LIB.getCompanies(); }
-function getProjects() { return IMS_LIB.getProjects(); }
-function processCustomerOrder(data) { return IMS_LIB.processCustomerOrder(data); }
-function cancelOrder(id) { return IMS_LIB.cancelOrder(id); }
-function getOutOfStockItems(email) { return IMS_LIB.getOutOfStockItems(email); }
-
-function getTaskNumbers() { return IMS_LIB.getTaskNumbers(); }
-function getOrderByTaskNumber(task) { return IMS_LIB.getOrderByTaskNumber(task); }
-function generatePickTicket(data) { return IMS_LIB.generatePickTicket(data); }
-function processPackingTOCAndShipment(data) { return IMS_LIB.processPackingTOCAndShipment(data); }
-function processPackingTOC_DocsOnly(data) { return IMS_LIB.processPackingTOC_DocsOnly(data); }
-function generateTOC(data) { return IMS_LIB.generateTOC(data); }
-function generatePackingLists(data) { return IMS_LIB.generatePackingLists(data); }
-
-function runOneTimeDeliveredOrderSync() {
-  if (typeof IMS_LIB.runOneTimeDeliveredOrderSync === 'function') return IMS_LIB.runOneTimeDeliveredOrderSync();
-  if (typeof IMS_LIB.forceUpdateDeliveredOrders === 'function') return IMS_LIB.forceUpdateDeliveredOrders();
-}
-
-function forceUpdateDeliveredOrders() { return IMS_LIB.forceUpdateDeliveredOrders(); }
-
-function getFBPNList() { return IMS_LIB.getFBPNList(); }
-function getNextSkidIdBase() { return IMS_LIB.getNextSkidIdBase(); }
-function getNextStagingSequence() { return IMS_LIB.getNextStagingSequence(); }
-function updateInboundStaging(stagingRows) { return IMS_LIB.updateInboundStaging(stagingRows); }
-function generateSKU(fbpn, manufacturer) { return IMS_LIB.generateSKU(fbpn, manufacturer); }
-function buildStockSkuFromFBPNAndManufacturer(fbpn, manufacturer) {
-  return IMS_LIB.buildStockSkuFromFBPNAndManufacturer(fbpn, manufacturer);
-}
-
-function fulfillBackorders(ss, fbpn, qtyReceived, txnId) {
-  return IMS_LIB.fulfillBackorders(ss, fbpn, qtyReceived, txnId);
-}
-function updateAllocationWithFulfillment(ss, backorderId, orderId, fbpn, qtyFulfilled) {
-  return IMS_LIB.updateAllocationWithFulfillment(ss, backorderId, orderId, fbpn, qtyFulfilled);
-}
-function updateCustomerOrderStockStatus(ss, orderId) {
-  return IMS_LIB.updateCustomerOrderStockStatus(ss, orderId);
-}
-function addInventoryBatch(data) { return IMS_LIB.addInventoryBatch(data); }
-function removeInventoryBatch(data) { return IMS_LIB.removeInventoryBatch(data); }
-function moveInventoryBatch(data) { return IMS_LIB.moveInventoryBatch(data); }
-function moveFromStaging(data) { return IMS_LIB.moveFromStaging(data); }
-function transferInventoryBatch(data) {
-  if (typeof IMS_LIB.transferInventoryBatch === 'function') return IMS_LIB.transferInventoryBatch(data);
-  return IMS_LIB.moveInventoryBatch(data);
-}
-function searchBins(params) { return IMS_LIB.searchBins(params); }
-function getBinDetails(bin) { return IMS_LIB.getBinDetails(bin); }
-function getBinHistory(bin) { return IMS_LIB.getBinHistory(bin); }
-function quickBarcodeScan(val) { return IMS_LIB.quickBarcodeScan(val); }
-
-function imsGetCycleCountBins(filter) { return IMS_LIB.imsGetCycleCountBins(filter); }
-function imsCreateCycleCountBatch(data) { return IMS_LIB.imsCreateCycleCountBatch(data); }
-function imsSubmitCycleCountLine(data) { return IMS_LIB.imsSubmitCycleCountLine(data); }
-function imsGetCycleBatch(id) { return IMS_LIB.imsGetCycleBatch(id); }
-
-function generateInboundReport(params) { return IMS_LIB.generateInboundReport(params); }
-function generateOutboundReport(params) { return IMS_LIB.generateOutboundReport(params); }
-
-function searchInboundByBOL(bol) { return IMS_LIB.searchInboundByBOL(bol); }
-function executeUndoByTxnId(txnId) { return IMS_LIB.executeUndoByTxnId(txnId); }
-function getRecentInboundTransactions(limit) { return IMS_LIB.getRecentInboundTransactions(limit); }
-function regenerateLabelsForTxn(txnId) { return IMS_LIB.regenerateLabelsForTxn(txnId); }
-function generateManualLabel(data) { return IMS_LIB.generateManualLabel(data); }
-function generateLabelsByBOL(bol) { return IMS_LIB.generateLabelsByBOL(bol); }
 
 // ----------------------------------------------------------------------------
 // BOL LOOKUP FOR MANUAL LABEL MODAL
@@ -857,20 +754,43 @@ function shell_lookupBOLData(bolNumber) {
   }
 }
 
-function authenticateUser(email) { return IMS_LIB.authenticateUser(email); }
-function searchInventoryForCustomer(email, criteria) { return IMS_LIB.searchInventoryForCustomer(email, criteria); }
-function getAvailableFBPNsForOrder(email) { return IMS_LIB.getAvailableFBPNsForOrder(email); }
-function submitCustomerOrderFromPortal(email, data) { return IMS_LIB.submitCustomerOrderFromPortal(email, data); }
-function getUserProjectAccess(email) { return IMS_LIB.getUserProjectAccess(email); }
-function getProjectsForPortal() { return IMS_LIB.getProjectsForPortal(); }
+// ----------------------------------------------------------------------------
+// CUSTOMER PORTAL FUNCTIONS
+// ----------------------------------------------------------------------------
+function authenticateUser(email) {
+  // Stub - implement customer authentication if needed
+  return { success: false, message: 'authenticateUser not implemented' };
+}
+
+function searchInventoryForCustomer(email, criteria) {
+  // Use getStockTotalsForWebApp for inventory search
+  return getStockTotalsForWebApp({ email: email }, criteria);
+}
+
+function getAvailableFBPNsForOrder(email) {
+  // Return FBPN list for ordering
+  return getFBPNList();
+}
+
+function submitCustomerOrderFromPortal(email, data) {
+  // Use processCustomerOrder for order submission
+  return processCustomerOrder(data);
+}
+
+function getUserProjectAccess(email) {
+  // Get user project access from Customer_Access sheet
+  const context = getUserContextDirect_();
+  return context.projectAccess || [];
+}
+
+function getProjectsForPortal() {
+  return getProjects();
+}
 
 // ----------------------------------------------------------------------------
 // MANUAL SKID LABEL GENERATION
 // ----------------------------------------------------------------------------
 function shell_generateManualSkidLabel(data) {
-  if (typeof IMS_LIB !== 'undefined' && typeof IMS_LIB.generateManualSkidLabelFromModal === 'function') {
-    return IMS_LIB.generateManualSkidLabelFromModal(data);
-  }
   return generateManualSkidLabelFromModal(data);
 }
 
@@ -908,7 +828,7 @@ function generateManualSkidLabelFromModal(data) {
     }
 
     const bolNumber = String(data.bol || 'MANUAL').trim();
-    const result = IMS_LIB.generateSkidLabels(labelData, { bolNumber: bolNumber });
+    const result = generateSkidLabels(labelData, { bolNumber: bolNumber });
 
     if (!result || !result.success) {
       return { success: false, message: (result && result.message) ? result.message : 'Label generation failed.' };
@@ -940,12 +860,6 @@ function generateRandomId_(prefix, length) {
 // WEBAPP FUNCTIONS
 // ----------------------------------------------------------------------------
 function getUserContext() {
-  const ssId = SpreadsheetApp.getActiveSpreadsheet().getId();
-
-  if (typeof IMS_LIB !== 'undefined' && IMS_LIB.getUserContextForWebApp) {
-    return IMS_LIB.getUserContextForWebApp(ssId);
-  }
-
   return getUserContextDirect_();
 }
 
@@ -1062,9 +976,6 @@ function buildPermissionsFromLevel_(accessLevel) {
 // ============================================================================
 
 function getDashboardMetrics() {
-  if (typeof IMS_LIB !== 'undefined' && IMS_LIB.getDashboardMetrics) {
-    return IMS_LIB.getDashboardMetrics();
-  }
   return getDashboardMetricsDirect_();
 }
 
@@ -1107,9 +1018,6 @@ function getDashboardMetricsDirect_() {
 // ============================================================================
 
 function getCustomerOrders(context) {
-  if (typeof IMS_LIB !== 'undefined' && IMS_LIB.getCustomerOrdersForWebApp) {
-    return IMS_LIB.getCustomerOrdersForWebApp(context);
-  }
   return getCustomerOrdersDirect_(context);
 }
 
@@ -1219,11 +1127,7 @@ function regenerateOrderDoc(orderId, docType) {
           }))
         };
 
-        if (typeof IMS_LIB !== 'undefined' && typeof IMS_LIB.generatePickTicket === 'function') {
-          result = IMS_LIB.generatePickTicket(pickData);
-        } else {
-          return { success: false, message: 'generatePickTicket function not available in library' };
-        }
+        result = generatePickTicket(pickData);
         break;
 
       case 'PACKING':
@@ -1257,17 +1161,9 @@ function regenerateOrderDoc(orderId, docType) {
         };
 
         if (docType === 'TOC') {
-          if (typeof IMS_LIB !== 'undefined' && typeof IMS_LIB.generateTOC === 'function') {
-            result = IMS_LIB.generateTOC(docData);
-          } else {
-            return { success: false, message: 'generateTOC function not available in library' };
-          }
+          result = generateTOC(docData);
         } else {
-          if (typeof IMS_LIB !== 'undefined' && typeof IMS_LIB.generatePackingLists === 'function') {
-            result = IMS_LIB.generatePackingLists(docData);
-          } else {
-            return { success: false, message: 'generatePackingLists function not available in library' };
-          }
+          result = generatePackingLists(docData);
         }
         break;
 
@@ -1404,10 +1300,6 @@ function getOrderDataForShipping(orderId) {
 }
 
 function getOrderByTaskNumber(taskNumber) {
-  if (typeof IMS_LIB !== 'undefined' && typeof IMS_LIB.getOrderByTaskNumber === 'function') {
-    return IMS_LIB.getOrderByTaskNumber(taskNumber);
-  }
-
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const orderSheet = ss.getSheetByName('Customer_Orders');
   const itemsSheet = ss.getSheetByName('Requested_Items');
@@ -1511,10 +1403,6 @@ function getOrderByTaskNumber(taskNumber) {
 const AUTOMATION_FOLDER_ID = '1L3mjeQizzjVU5uTqGxv1sOUOuq25I2pM';
 
 function uploadToAutomationFolder(fileData) {
-  if (typeof IMS_LIB !== 'undefined' && IMS_LIB.uploadToAutomationFolder) {
-    return IMS_LIB.uploadToAutomationFolder(fileData);
-  }
-
   try {
     if (!fileData || !fileData.content || !fileData.fileName) {
       return { success: false, message: 'Missing file data' };
@@ -1546,8 +1434,7 @@ function getCompaniesFiltered(context) {
   if (context && context.accessLevel === 'Standard' && context.company) {
     return [context.company];
   }
-  return typeof IMS_LIB !== 'undefined' && IMS_LIB.getCompanies ?
-    IMS_LIB.getCompanies() : getCompaniesDirect_();
+  return getCompaniesDirect_();
 }
 
 function getCompaniesDirect_() {
