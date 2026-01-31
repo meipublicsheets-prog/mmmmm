@@ -790,6 +790,73 @@ function regenerateLabelsForTxn(txnId) { return IMS_LIB.regenerateLabelsForTxn(t
 function generateManualLabel(data) { return IMS_LIB.generateManualLabel(data); }
 function generateLabelsByBOL(bol) { return IMS_LIB.generateLabelsByBOL(bol); }
 
+// ----------------------------------------------------------------------------
+// BOL LOOKUP FOR MANUAL LABEL MODAL
+// ----------------------------------------------------------------------------
+/**
+ * Looks up BOL data from Master_Log to pre-populate the manual label form.
+ * Returns the first matching record's data (Manufacturer, Project, Push #, Total Skids).
+ */
+function shell_lookupBOLData(bolNumber) {
+  try {
+    if (!bolNumber || !String(bolNumber).trim()) {
+      return { success: false, message: 'BOL number is required.' };
+    }
+
+    const bol = String(bolNumber).trim().toUpperCase();
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Master_Log');
+
+    if (!sheet) {
+      return { success: false, message: 'Master_Log sheet not found.' };
+    }
+
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) {
+      return { success: false, message: 'No data in Master_Log.' };
+    }
+
+    const headers = data[0];
+    const colIdx = (name) => headers.indexOf(name);
+
+    const bolCol = colIdx('BOL_Number');
+    const mfgCol = colIdx('Manufacturer');
+    const projCol = colIdx('Project');
+    const pushCol = colIdx('Push #');
+    const totalSkidsCol = colIdx('Total_Skid_Count');
+    const fbpnCol = colIdx('FBPN');
+    const warehouseCol = colIdx('Warehouse');
+
+    if (bolCol < 0) {
+      return { success: false, message: 'BOL_Number column not found in Master_Log.' };
+    }
+
+    // Find first matching BOL record
+    for (let i = 1; i < data.length; i++) {
+      const rowBol = String(data[i][bolCol] || '').trim().toUpperCase();
+      if (rowBol === bol) {
+        return {
+          success: true,
+          data: {
+            manufacturer: mfgCol >= 0 ? String(data[i][mfgCol] || '') : '',
+            project: projCol >= 0 ? String(data[i][projCol] || '') : '',
+            pushNumber: pushCol >= 0 ? String(data[i][pushCol] || '') : '',
+            totalSkids: totalSkidsCol >= 0 ? (parseInt(data[i][totalSkidsCol]) || 1) : 1,
+            fbpn: fbpnCol >= 0 ? String(data[i][fbpnCol] || '') : '',
+            warehouse: warehouseCol >= 0 ? String(data[i][warehouseCol] || '') : ''
+          }
+        };
+      }
+    }
+
+    return { success: false, message: 'BOL not found in Master_Log.' };
+
+  } catch (err) {
+    Logger.log('shell_lookupBOLData error: ' + err.toString());
+    return { success: false, message: 'Error: ' + err.message };
+  }
+}
+
 function authenticateUser(email) { return IMS_LIB.authenticateUser(email); }
 function searchInventoryForCustomer(email, criteria) { return IMS_LIB.searchInventoryForCustomer(email, criteria); }
 function getAvailableFBPNsForOrder(email) { return IMS_LIB.getAvailableFBPNsForOrder(email); }
