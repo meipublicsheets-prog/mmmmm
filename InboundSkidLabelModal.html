@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <?!= include('UniversalStyles'); ?>
+    <style>
+        /* ---------- Responsive container ---------- */
+        .wrap {
+            width: 100%;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 10px;
+        }
+
+        /* ---------- Responsive grids ---------- */
+        .grid2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 12px;
+        }
+
+        .grid3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .help {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            margin-top: 6px;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-top: 16px;
+        }
+
+        .toolbar .btn {
+            min-width: 140px;
+        }
+
+        /* ---------- Inputs ---------- */
+        .form-input {
+            height: 40px;
+            padding: 8px 10px;
+        }
+
+        input.form-input[type="number"] {
+            max-width: 160px;
+        }
+
+        /* ---------- Footer ---------- */
+        .section-footer {
+            margin-top: 12px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .section-footer .btn {
+            min-width: 160px;
+        }
+
+        /* ---------- Success links ---------- */
+        .alert-success a {
+            color: var(--primary-600, #2563eb);
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .alert-success a:hover {
+            text-decoration: underline;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* ---------- Autocomplete ---------- */
+        .autocomplete-wrapper {
+            position: relative;
+        }
+
+        .autocomplete-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #fff;
+            border: 1px solid var(--border-color, #e5e7eb);
+            border-radius: var(--radius-sm, 4px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 100;
+        }
+
+        .autocomplete-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .autocomplete-item:hover,
+        .autocomplete-item.active {
+            background: var(--primary-50, #eff6ff);
+        }
+
+        /* ---------- Preview Section ---------- */
+        .preview-box {
+            background: #f9fafb;
+            border: 1px solid var(--border-color, #e5e7eb);
+            border-radius: var(--radius-sm, 4px);
+            padding: 16px;
+            margin-top: 12px;
+        }
+
+        .preview-title {
+            font-weight: 700;
+            margin-bottom: 12px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .preview-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .preview-row:last-child {
+            border-bottom: none;
+        }
+
+        .preview-label {
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .preview-value {
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        /* ---------- Badge for copies ---------- */
+        .copies-badge {
+            display: inline-block;
+            background: var(--primary-600, #2563eb);
+            color: #fff;
+            padding: 2px 10px;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="loading-overlay" id="loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text" id="loadingText">Loading...</div>
+    </div>
+
+    <div class="modal-container wrap">
+        <div class="modal-header">
+            <h1>Create Inbound Skid Label</h1>
+            <p>Manually create skid labels for inbound deliveries.</p>
+        </div>
+
+        <div class="tab-content active">
+            <!-- Basic Info Section -->
+            <div class="section">
+                <div class="section-title">Label Information</div>
+
+                <div class="grid2">
+                    <div class="form-group autocomplete-wrapper">
+                        <label class="form-label required" for="fbpnInput">FBPN</label>
+                        <input id="fbpnInput" type="text" class="form-input" placeholder="Enter or select FBPN"
+                            autocomplete="off">
+                        <div id="fbpnList" class="autocomplete-list hidden"></div>
+                        <div class="help">Start typing to search available FBPNs.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label required" for="qtyInput">Quantity</label>
+                        <input id="qtyInput" type="number" class="form-input" placeholder="Enter quantity" min="1"
+                            step="1" value="1">
+                    </div>
+                </div>
+
+                <div class="grid2">
+                    <div class="form-group">
+                        <label class="form-label required" for="manufacturerSelect">Manufacturer</label>
+                        <select id="manufacturerSelect" class="form-input">
+                            <option value="">Select Manufacturer...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label required" for="projectInput">Project</label>
+                        <input id="projectInput" type="text" class="form-input" placeholder="Enter project name">
+                    </div>
+                </div>
+
+                <div class="grid2">
+                    <div class="form-group">
+                        <label class="form-label" for="pushInput">Push Number</label>
+                        <input id="pushInput" type="text" class="form-input" placeholder="e.g., PUSH-001">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="bolInput">BOL Number</label>
+                        <input id="bolInput" type="text" class="form-input" placeholder="e.g., BOL12345 (optional)">
+                        <div class="help">Optional. Used for folder organization.</div>
+                    </div>
+                </div>
+
+                <div class="grid3">
+                    <div class="form-group">
+                        <label class="form-label" for="skidNumberInput">Skid Number</label>
+                        <input id="skidNumberInput" type="number" class="form-input" placeholder="1" min="1" step="1"
+                            value="1">
+                        <div class="help">Current skid in sequence.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="totalSkidsInput">Total Skids</label>
+                        <input id="totalSkidsInput" type="number" class="form-input" placeholder="1" min="1" step="1"
+                            value="1">
+                        <div class="help">Total skids in delivery.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="copiesInput">Number of Copies</label>
+                        <input id="copiesInput" type="number" class="form-input" placeholder="1" min="1" max="50"
+                            step="1" value="1">
+                        <div class="help">Duplicate labels (max 50).</div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="notesInput">Notes (Optional)</label>
+                    <input id="notesInput" type="text" class="form-input" placeholder="Any additional notes for the label">
+                </div>
+            </div>
+
+            <!-- Preview Section -->
+            <div class="section">
+                <div class="section-title">Label Preview</div>
+                <div class="preview-box" id="previewBox">
+                    <div class="preview-title">Label will contain:</div>
+                    <div class="preview-row">
+                        <span class="preview-label">Manufacturer:</span>
+                        <span class="preview-value" id="prevManufacturer">-</span>
+                    </div>
+                    <div class="preview-row">
+                        <span class="preview-label">Push #:</span>
+                        <span class="preview-value" id="prevPush">-</span>
+                    </div>
+                    <div class="preview-row">
+                        <span class="preview-label">Total Skids:</span>
+                        <span class="preview-value" id="prevTotalSkids">1</span>
+                    </div>
+                    <div class="preview-row">
+                        <span class="preview-label">FBPN:</span>
+                        <span class="preview-value" id="prevFbpn">-</span>
+                    </div>
+                    <div class="preview-row">
+                        <span class="preview-label">Quantity:</span>
+                        <span class="preview-value" id="prevQty">1</span>
+                    </div>
+                    <div class="preview-row">
+                        <span class="preview-label">Project:</span>
+                        <span class="preview-value" id="prevProject">-</span>
+                    </div>
+                    <div class="preview-row">
+                        <span class="preview-label">SKU:</span>
+                        <span class="preview-value" id="prevSku">-</span>
+                    </div>
+                    <div class="preview-row">
+                        <span class="preview-label">Copies:</span>
+                        <span class="preview-value" id="prevCopies">1</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="section">
+                <div id="errorMsg" class="alert alert-danger hidden"></div>
+                <div id="successMsg" class="alert alert-success hidden">
+                    <div style="font-weight:700; margin-bottom:8px;">Labels Generated Successfully</div>
+                    <div><a id="pdfLink" href="#" target="_blank" rel="noopener">Open Label PDF</a></div>
+                    <div style="margin-top:6px;"><a id="htmlLink" href="#" target="_blank" rel="noopener">Open Label HTML</a></div>
+                </div>
+
+                <div class="toolbar">
+                    <button class="btn btn-secondary" id="resetBtn" type="button">Reset Form</button>
+                    <button class="btn btn-primary" id="generateBtn" type="button">Generate Labels</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const $ = (id) => document.getElementById(id);
+
+        let _fbpnList = [];
+        let _manufacturers = [];
+        let _debounce = null;
+
+        // =============== UTILITIES ===============
+        function showLoading(on, msg) {
+            const el = $('loading');
+            const txt = $('loadingText');
+            if (msg) txt.textContent = msg;
+            el.classList.toggle('active', !!on);
+        }
+
+        function showError(msg) {
+            $('errorMsg').textContent = msg || '';
+            $('errorMsg').classList.toggle('hidden', !msg);
+            $('successMsg').classList.add('hidden');
+        }
+
+        function showSuccess(pdfUrl, htmlUrl) {
+            $('errorMsg').classList.add('hidden');
+            $('successMsg').classList.remove('hidden');
+
+            if (pdfUrl) {
+                $('pdfLink').href = pdfUrl;
+                $('pdfLink').classList.remove('hidden');
+            } else {
+                $('pdfLink').classList.add('hidden');
+            }
+
+            if (htmlUrl) {
+                $('htmlLink').href = htmlUrl;
+                $('htmlLink').classList.remove('hidden');
+            } else {
+                $('htmlLink').classList.add('hidden');
+            }
+        }
+
+        function normalize(v) {
+            return String(v || '').trim();
+        }
+
+        // =============== AUTOCOMPLETE ===============
+        function filterFbpns(query) {
+            const q = query.toUpperCase();
+            return _fbpnList.filter(f => f.toUpperCase().includes(q)).slice(0, 20);
+        }
+
+        function renderAutocomplete(items) {
+            const list = $('fbpnList');
+            if (!items || items.length === 0) {
+                list.classList.add('hidden');
+                return;
+            }
+
+            list.innerHTML = items.map(item =>
+                `<div class="autocomplete-item" data-value="${item}">${item}</div>`
+            ).join('');
+            list.classList.remove('hidden');
+        }
+
+        function hideAutocomplete() {
+            $('fbpnList').classList.add('hidden');
+        }
+
+        // =============== SKU GENERATION ===============
+        function generateSkuPreview(fbpn, manufacturer) {
+            if (!fbpn || !manufacturer) return '-';
+            const cleanFBPN = fbpn.toString().trim();
+            const cleanMan = manufacturer.toString().trim();
+            if (!cleanFBPN || !cleanMan) return '-';
+            const manPrefix = cleanMan.substring(0, 3).toUpperCase();
+            return `${cleanFBPN}-${manPrefix}`;
+        }
+
+        // =============== PREVIEW UPDATE ===============
+        function updatePreview() {
+            const fbpn = normalize($('fbpnInput').value).toUpperCase();
+            const qty = normalize($('qtyInput').value) || '1';
+            const manufacturer = normalize($('manufacturerSelect').value);
+            const project = normalize($('projectInput').value);
+            const push = normalize($('pushInput').value);
+            const totalSkids = normalize($('totalSkidsInput').value) || '1';
+            const copies = normalize($('copiesInput').value) || '1';
+
+            $('prevManufacturer').textContent = manufacturer || '-';
+            $('prevPush').textContent = push || '-';
+            $('prevTotalSkids').textContent = totalSkids;
+            $('prevFbpn').textContent = fbpn || '-';
+            $('prevQty').textContent = qty;
+            $('prevProject').textContent = project || '-';
+            $('prevSku').textContent = generateSkuPreview(fbpn, manufacturer);
+            $('prevCopies').textContent = copies;
+        }
+
+        // =============== VALIDATION ===============
+        function validate() {
+            const fbpn = normalize($('fbpnInput').value);
+            const qty = parseFloat($('qtyInput').value) || 0;
+            const manufacturer = normalize($('manufacturerSelect').value);
+            const project = normalize($('projectInput').value);
+
+            if (!fbpn) return 'FBPN is required.';
+            if (qty <= 0) return 'Quantity must be greater than 0.';
+            if (!manufacturer) return 'Manufacturer is required.';
+            if (!project) return 'Project is required.';
+
+            return null;
+        }
+
+        // =============== GENERATE LABELS ===============
+        function generateLabels() {
+            const err = validate();
+            if (err) {
+                showError(err);
+                return;
+            }
+
+            showError('');
+            showLoading(true, 'Generating labels...');
+
+            const data = {
+                fbpn: normalize($('fbpnInput').value).toUpperCase(),
+                qty: parseFloat($('qtyInput').value) || 1,
+                manufacturer: normalize($('manufacturerSelect').value),
+                project: normalize($('projectInput').value),
+                push: normalize($('pushInput').value),
+                bol: normalize($('bolInput').value),
+                skidNumber: parseInt($('skidNumberInput').value) || 1,
+                totalSkids: parseInt($('totalSkidsInput').value) || 1,
+                copies: Math.min(50, Math.max(1, parseInt($('copiesInput').value) || 1)),
+                notes: normalize($('notesInput').value)
+            };
+
+            google.script.run
+                .withSuccessHandler((res) => {
+                    showLoading(false);
+                    if (res && res.success) {
+                        showSuccess(res.pdfUrl, res.htmlUrl);
+                    } else {
+                        showError((res && res.message) ? res.message : 'Label generation failed.');
+                    }
+                })
+                .withFailureHandler((err) => {
+                    showLoading(false);
+                    showError('Error: ' + (err && err.message ? err.message : err));
+                    console.error(err);
+                })
+                .shell_generateManualSkidLabel(data);
+        }
+
+        // =============== RESET ===============
+        function resetForm() {
+            $('fbpnInput').value = '';
+            $('qtyInput').value = '1';
+            $('manufacturerSelect').value = '';
+            $('projectInput').value = '';
+            $('pushInput').value = '';
+            $('bolInput').value = '';
+            $('skidNumberInput').value = '1';
+            $('totalSkidsInput').value = '1';
+            $('copiesInput').value = '1';
+            $('notesInput').value = '';
+
+            showError('');
+            $('successMsg').classList.add('hidden');
+            hideAutocomplete();
+            updatePreview();
+        }
+
+        // =============== INITIALIZATION ===============
+        function init() {
+            showLoading(true, 'Loading data...');
+
+            // Load FBPNs
+            google.script.run
+                .withSuccessHandler((list) => {
+                    _fbpnList = list || [];
+                })
+                .withFailureHandler((err) => {
+                    console.error('Failed to load FBPN list:', err);
+                })
+                .getFBPNList();
+
+            // Load Manufacturers
+            google.script.run
+                .withSuccessHandler((list) => {
+                    showLoading(false);
+                    _manufacturers = list || [];
+                    const sel = $('manufacturerSelect');
+                    _manufacturers.forEach(m => {
+                        const opt = document.createElement('option');
+                        opt.value = m;
+                        opt.textContent = m;
+                        sel.appendChild(opt);
+                    });
+                })
+                .withFailureHandler((err) => {
+                    showLoading(false);
+                    console.error('Failed to load manufacturers:', err);
+                })
+                .getManufacturers();
+        }
+
+        // =============== EVENT LISTENERS ===============
+        $('fbpnInput').addEventListener('input', () => {
+            clearTimeout(_debounce);
+            _debounce = setTimeout(() => {
+                const q = normalize($('fbpnInput').value);
+                if (q.length >= 1) {
+                    renderAutocomplete(filterFbpns(q));
+                } else {
+                    hideAutocomplete();
+                }
+                updatePreview();
+            }, 150);
+        });
+
+        $('fbpnInput').addEventListener('blur', () => {
+            // Delay to allow click on autocomplete item
+            setTimeout(hideAutocomplete, 200);
+        });
+
+        $('fbpnList').addEventListener('click', (e) => {
+            if (e.target.classList.contains('autocomplete-item')) {
+                $('fbpnInput').value = e.target.getAttribute('data-value');
+                hideAutocomplete();
+                updatePreview();
+            }
+        });
+
+        // Update preview on any input change
+        ['qtyInput', 'manufacturerSelect', 'projectInput', 'pushInput',
+         'totalSkidsInput', 'copiesInput'].forEach(id => {
+            $(id).addEventListener('input', updatePreview);
+            $(id).addEventListener('change', updatePreview);
+        });
+
+        $('generateBtn').addEventListener('click', generateLabels);
+        $('resetBtn').addEventListener('click', resetForm);
+
+        // Initialize
+        init();
+        updatePreview();
+    </script>
+</body>
+
+</html>
