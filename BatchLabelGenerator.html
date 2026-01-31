@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <?!= include('UniversalStyles'); ?>
+    <style>
+        .wrap {
+            width: 100%;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 10px;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .toolbar-left {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .filter-group label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .filter-group input,
+        .filter-group select {
+            height: 36px;
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 0.9rem;
+        }
+
+        .table-wrap {
+            overflow: auto;
+            max-height: 450px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .data-table thead th {
+            position: sticky;
+            top: 0;
+            background: var(--bg-secondary);
+            z-index: 1;
+            font-weight: 600;
+        }
+
+        .data-table tbody tr:hover {
+            background: var(--bg-hover);
+        }
+
+        .data-table input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 500;
+        }
+
+        .status-badge.has-labels {
+            background: rgba(34, 197, 94, 0.15);
+            color: #16a34a;
+        }
+
+        .status-badge.no-labels {
+            background: rgba(239, 68, 68, 0.15);
+            color: #dc2626;
+        }
+
+        .status-badge.unknown {
+            background: rgba(107, 114, 128, 0.15);
+            color: #6b7280;
+        }
+
+        .summary-bar {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-sm);
+            margin-bottom: 16px;
+        }
+
+        .summary-item {
+            font-size: 0.9rem;
+        }
+
+        .summary-item strong {
+            font-weight: 600;
+        }
+
+        .progress-section {
+            margin-top: 16px;
+            display: none;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 24px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--primary-600, #2563eb);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .progress-log {
+            margin-top: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+            background: var(--bg-secondary);
+            padding: 10px;
+            border-radius: var(--radius-sm);
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+
+        .progress-log-entry {
+            padding: 2px 0;
+        }
+
+        .progress-log-entry.success {
+            color: #16a34a;
+        }
+
+        .progress-log-entry.error {
+            color: #dc2626;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .muted {
+            color: var(--text-muted);
+        }
+
+        .select-all-container {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text" id="loadingText">Loading BOLs...</div>
+    </div>
+
+    <div class="modal-container wrap">
+        <div class="modal-header">
+            <h1>Batch Label Generator</h1>
+            <p>Generate inbound skid labels for past BOLs. Select BOLs to regenerate or create missing labels.</p>
+        </div>
+
+        <div class="tab-content active">
+            <div class="summary-bar">
+                <div class="summary-item"><strong id="totalCount">0</strong> Total BOLs</div>
+                <div class="summary-item"><strong id="hasLabelsCount">0</strong> With Labels</div>
+                <div class="summary-item"><strong id="noLabelsCount">0</strong> Missing Labels</div>
+                <div class="summary-item"><strong id="selectedCount">0</strong> Selected</div>
+            </div>
+
+            <div class="toolbar">
+                <div class="toolbar-left">
+                    <div class="filter-group">
+                        <label>Filter:</label>
+                        <select id="filterStatus" class="form-input">
+                            <option value="all">All</option>
+                            <option value="no-labels">Missing Labels Only</option>
+                            <option value="has-labels">Has Labels Only</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Search:</label>
+                        <input type="text" id="searchInput" class="form-input" placeholder="BOL, TXN, FBPN...">
+                    </div>
+                    <button class="btn btn-secondary" id="refreshBtn">Refresh</button>
+                </div>
+                <div class="toolbar-right">
+                    <button class="btn btn-secondary" id="selectAllVisibleBtn">Select Visible</button>
+                    <button class="btn btn-secondary" id="deselectAllBtn">Deselect All</button>
+                    <button class="btn btn-primary" id="generateBtn" disabled>Generate Labels</button>
+                </div>
+            </div>
+
+            <div id="statusMsg" class="alert alert-info hidden"></div>
+            <div id="errorMsg" class="alert alert-danger hidden"></div>
+
+            <div class="table-wrap">
+                <table class="data-table" id="bolTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px;">
+                                <div class="select-all-container">
+                                    <input type="checkbox" id="selectAllCheckbox" title="Select all visible">
+                                </div>
+                            </th>
+                            <th>BOL Number</th>
+                            <th>Date</th>
+                            <th>TXN ID</th>
+                            <th>FBPN</th>
+                            <th>Skids</th>
+                            <th>Label Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bolTableBody">
+                        <tr>
+                            <td colspan="7" class="muted">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="progress-section" id="progressSection">
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progressBar" style="width: 0%;">0%</div>
+                </div>
+                <div class="progress-log" id="progressLog"></div>
+            </div>
+
+            <div id="resultsSection" class="alert alert-success hidden" style="margin-top: 16px;">
+                <div style="font-weight: 700; margin-bottom: 8px;">Generation Complete</div>
+                <div id="resultsText"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const $ = id => document.getElementById(id);
+
+        let allBols = [];
+        let selectedBols = new Set();
+        let isGenerating = false;
+
+        function showLoading(on, msg) {
+            $('loading').classList.toggle('active', !!on);
+            if (msg) $('loadingText').textContent = msg;
+        }
+
+        function showInfo(msg) {
+            $('statusMsg').textContent = msg || '';
+            $('statusMsg').classList.toggle('hidden', !msg);
+        }
+
+        function showError(msg) {
+            $('errorMsg').textContent = msg || '';
+            $('errorMsg').classList.toggle('hidden', !msg);
+        }
+
+        function updateCounts() {
+            const hasLabels = allBols.filter(b => b.hasLabels).length;
+            const noLabels = allBols.filter(b => !b.hasLabels).length;
+
+            $('totalCount').textContent = allBols.length;
+            $('hasLabelsCount').textContent = hasLabels;
+            $('noLabelsCount').textContent = noLabels;
+            $('selectedCount').textContent = selectedBols.size;
+
+            $('generateBtn').disabled = selectedBols.size === 0 || isGenerating;
+        }
+
+        function getFilteredBols() {
+            const filter = $('filterStatus').value;
+            const search = $('searchInput').value.toLowerCase().trim();
+
+            return allBols.filter(bol => {
+                // Status filter
+                if (filter === 'no-labels' && bol.hasLabels) return false;
+                if (filter === 'has-labels' && !bol.hasLabels) return false;
+
+                // Search filter
+                if (search) {
+                    const searchStr = [
+                        bol.bol, bol.txnId, bol.fbpn, bol.manufacturer, bol.project
+                    ].join(' ').toLowerCase();
+                    if (!searchStr.includes(search)) return false;
+                }
+
+                return true;
+            });
+        }
+
+        function renderTable() {
+            const filtered = getFilteredBols();
+            const tbody = $('bolTableBody');
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="muted">No BOLs match the current filter.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(bol => {
+                const checked = selectedBols.has(bol.key) ? 'checked' : '';
+                const statusClass = bol.hasLabels ? 'has-labels' : 'no-labels';
+                const statusText = bol.hasLabels ? 'Has Labels' : 'Missing';
+
+                return `
+                    <tr data-key="${escapeAttr(bol.key)}">
+                        <td><input type="checkbox" class="bol-checkbox" data-key="${escapeAttr(bol.key)}" ${checked}></td>
+                        <td>${escapeHtml(bol.bol)}</td>
+                        <td>${escapeHtml(bol.dateStr)}</td>
+                        <td>${escapeHtml(bol.txnId)}</td>
+                        <td>${escapeHtml(bol.fbpn)}</td>
+                        <td>${bol.skidCount}</td>
+                        <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Update select all checkbox state
+            const visibleKeys = filtered.map(b => b.key);
+            const allVisibleSelected = visibleKeys.length > 0 && visibleKeys.every(k => selectedBols.has(k));
+            $('selectAllCheckbox').checked = allVisibleSelected;
+        }
+
+        function escapeHtml(s) {
+            return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function escapeAttr(s) {
+            return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+        }
+
+        function loadBols() {
+            showLoading(true, 'Loading BOL data...');
+            showError('');
+            showInfo('');
+
+            google.script.run
+                .withSuccessHandler(res => {
+                    showLoading(false);
+                    if (res && res.success) {
+                        allBols = res.bols || [];
+                        selectedBols.clear();
+                        updateCounts();
+                        renderTable();
+                        showInfo(`Loaded ${allBols.length} BOLs.`);
+                    } else {
+                        showError(res.message || 'Failed to load BOLs.');
+                    }
+                })
+                .withFailureHandler(err => {
+                    showLoading(false);
+                    showError('Error: ' + (err.message || err));
+                })
+                .shell_getBolsForLabelGeneration();
+        }
+
+        function toggleSelection(key, checked) {
+            if (checked) {
+                selectedBols.add(key);
+            } else {
+                selectedBols.delete(key);
+            }
+            updateCounts();
+        }
+
+        function selectAllVisible() {
+            const filtered = getFilteredBols();
+            filtered.forEach(bol => selectedBols.add(bol.key));
+            updateCounts();
+            renderTable();
+        }
+
+        function deselectAll() {
+            selectedBols.clear();
+            updateCounts();
+            renderTable();
+        }
+
+        async function generateLabels() {
+            if (selectedBols.size === 0) return;
+
+            isGenerating = true;
+            $('generateBtn').disabled = true;
+            $('progressSection').style.display = 'block';
+            $('resultsSection').classList.add('hidden');
+            $('progressLog').innerHTML = '';
+
+            const keys = Array.from(selectedBols);
+            const total = keys.length;
+            let completed = 0;
+            let success = 0;
+            let failed = 0;
+
+            for (const key of keys) {
+                const bol = allBols.find(b => b.key === key);
+                if (!bol) continue;
+
+                addLogEntry(`Processing: ${bol.bol} (${bol.txnId})...`, '');
+
+                try {
+                    const result = await new Promise((resolve, reject) => {
+                        google.script.run
+                            .withSuccessHandler(resolve)
+                            .withFailureHandler(reject)
+                            .shell_generateLabelsForBol(bol.txnId, bol.bol);
+                    });
+
+                    completed++;
+                    if (result && result.success) {
+                        success++;
+                        addLogEntry(`  Success: ${bol.bol}`, 'success');
+                        // Update the bol status
+                        bol.hasLabels = true;
+                    } else {
+                        failed++;
+                        addLogEntry(`  Failed: ${bol.bol} - ${result.message || 'Unknown error'}`, 'error');
+                    }
+                } catch (err) {
+                    completed++;
+                    failed++;
+                    addLogEntry(`  Error: ${bol.bol} - ${err.message || err}`, 'error');
+                }
+
+                updateProgress(completed, total);
+            }
+
+            isGenerating = false;
+            $('generateBtn').disabled = false;
+            selectedBols.clear();
+            updateCounts();
+            renderTable();
+
+            $('resultsSection').classList.remove('hidden');
+            $('resultsText').textContent = `Generated labels for ${success} BOL(s). ${failed > 0 ? `${failed} failed.` : ''}`;
+        }
+
+        function updateProgress(completed, total) {
+            const pct = Math.round((completed / total) * 100);
+            $('progressBar').style.width = pct + '%';
+            $('progressBar').textContent = `${completed}/${total} (${pct}%)`;
+        }
+
+        function addLogEntry(text, type) {
+            const div = document.createElement('div');
+            div.className = 'progress-log-entry' + (type ? ' ' + type : '');
+            div.textContent = text;
+            $('progressLog').appendChild(div);
+            $('progressLog').scrollTop = $('progressLog').scrollHeight;
+        }
+
+        // Event Listeners
+        $('bolTableBody').addEventListener('change', e => {
+            if (e.target.classList.contains('bol-checkbox')) {
+                toggleSelection(e.target.dataset.key, e.target.checked);
+            }
+        });
+
+        $('selectAllCheckbox').addEventListener('change', e => {
+            const filtered = getFilteredBols();
+            if (e.target.checked) {
+                filtered.forEach(bol => selectedBols.add(bol.key));
+            } else {
+                filtered.forEach(bol => selectedBols.delete(bol.key));
+            }
+            updateCounts();
+            renderTable();
+        });
+
+        $('filterStatus').addEventListener('change', renderTable);
+        $('searchInput').addEventListener('input', renderTable);
+        $('refreshBtn').addEventListener('click', loadBols);
+        $('selectAllVisibleBtn').addEventListener('click', selectAllVisible);
+        $('deselectAllBtn').addEventListener('click', deselectAll);
+        $('generateBtn').addEventListener('click', generateLabels);
+
+        // Initialize
+        loadBols();
+    </script>
+</body>
+</html>
