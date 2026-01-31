@@ -767,11 +767,12 @@ function generateSkidLabelsHtml_(labelData) {
   </style></head><body>`;
 
   labelData.forEach(d => {
-    // Top Right: QR Code for Deep Link Lookup
+    // Top Right: SKU barcode
+    const skuBarcodeUri = bwipPngDataUri_('code128', d.sku, { scale: 3, height: 15 });
+    // Bottom: Skid ID barcode (with deep link QR if base URL is configured)
     const deepLink = base ? `${base}?skid=${encodeURIComponent(d.skidId)}` : d.skidId;
-    const topCodeType = base ? 'qrcode' : 'code128';
-    const topBarcodeUri = bwipPngDataUri_(topCodeType, deepLink, { scale: 3, height: 15 });
-    const skuBarcodeUri = bwipPngDataUri_('code128', d.sku, { scale: 4, height: 14 });
+    const bottomCodeType = base ? 'qrcode' : 'code128';
+    const skidBarcodeUri = bwipPngDataUri_(bottomCodeType, deepLink, { scale: 4, height: 14 });
 
     html += `
     <div class="label">
@@ -782,8 +783,8 @@ function generateSkidLabelsHtml_(labelData) {
           <div class="totalSkids-line">TOTAL SKIDS: ${escapeHtml_(d.totalSkids)}</div>
         </div>
         <div class="top-right">
-          <div class="top-barcode"><img src="${topBarcodeUri}" class="top-barcode-img"></div>
-          <div class="skid-id-text">${escapeHtml_(d.skidId)}</div>
+          <div class="top-barcode"><img src="${skuBarcodeUri}" class="top-barcode-img"></div>
+          <div class="skid-id-text">${escapeHtml_(d.sku)}</div>
         </div>
       </div>
       <div class="middle-block">
@@ -792,9 +793,9 @@ function generateSkidLabelsHtml_(labelData) {
         <div class="line-project">PROJECT: ${escapeHtml_(d.project)}</div>
       </div>
       <div class="bottom-block">
-        <div class="scan-to-pick-text">Scan SKU to Pick</div>
-        <div class="bottom-barcode"><img src="${skuBarcodeUri}" class="bottom-barcode-img" style="width:100%; height:100%;"></div>
-        <div style="font-size: 10pt; margin-top: 2px;">${escapeHtml_(d.sku)}</div>
+        <div class="scan-to-pick-text">Scan Skid ID</div>
+        <div class="bottom-barcode"><img src="${skidBarcodeUri}" class="bottom-barcode-img" style="width:100%; height:100%;"></div>
+        <div style="font-size: 10pt; margin-top: 2px;">${escapeHtml_(d.skidId)}</div>
       </div>
     </div>`;
   });

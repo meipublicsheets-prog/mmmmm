@@ -213,14 +213,18 @@
 
                 <div class="grid2">
                     <div class="form-group">
-                        <label class="form-label" for="pushInput">Push Number</label>
-                        <input id="pushInput" type="text" class="form-input" placeholder="e.g., PUSH-001">
+                        <label class="form-label" for="bolInput">BOL Number</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input id="bolInput" type="text" class="form-input" style="flex: 1;" placeholder="e.g., BOL12345">
+                            <button type="button" id="lookupBolBtn" class="btn btn-secondary" style="white-space: nowrap;">Lookup</button>
+                        </div>
+                        <div class="help">Enter BOL to auto-fill fields from Master_Log.</div>
+                        <div id="bolStatus" class="help" style="color: var(--success-600, #16a34a); display: none;"></div>
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label" for="bolInput">BOL Number</label>
-                        <input id="bolInput" type="text" class="form-input" placeholder="e.g., BOL12345 (optional)">
-                        <div class="help">Optional. Used for folder organization.</div>
+                        <label class="form-label" for="pushInput">Push Number</label>
+                        <input id="pushInput" type="text" class="form-input" placeholder="e.g., PUSH-001">
                     </div>
                 </div>
 
@@ -407,6 +411,68 @@
             $('prevCopies').textContent = copies;
         }
 
+        // =============== BOL LOOKUP ===============
+        let _bolLookupDebounce = null;
+
+        function lookupBOL() {
+            const bol = normalize($('bolInput').value);
+            if (!bol) {
+                showBolStatus('', false);
+                return;
+            }
+
+            showBolStatus('Looking up BOL...', false);
+
+            google.script.run
+                .withSuccessHandler((res) => {
+                    if (res && res.success && res.data) {
+                        // Populate form fields
+                        if (res.data.manufacturer) {
+                            const sel = $('manufacturerSelect');
+                            for (let i = 0; i < sel.options.length; i++) {
+                                if (sel.options[i].value === res.data.manufacturer) {
+                                    sel.selectedIndex = i;
+                                    break;
+                                }
+                            }
+                        }
+                        if (res.data.project) {
+                            $('projectInput').value = res.data.project;
+                        }
+                        if (res.data.pushNumber) {
+                            $('pushInput').value = res.data.pushNumber;
+                        }
+                        if (res.data.totalSkids) {
+                            $('totalSkidsInput').value = res.data.totalSkids;
+                        }
+                        if (res.data.fbpn) {
+                            $('fbpnInput').value = res.data.fbpn;
+                        }
+
+                        showBolStatus('Found! Fields populated from Master_Log.', true);
+                        updatePreview();
+                    } else {
+                        showBolStatus(res.message || 'BOL not found.', false);
+                    }
+                })
+                .withFailureHandler((err) => {
+                    showBolStatus('Lookup failed: ' + (err.message || err), false);
+                    console.error('BOL lookup error:', err);
+                })
+                .shell_lookupBOLData(bol);
+        }
+
+        function showBolStatus(msg, isSuccess) {
+            const el = $('bolStatus');
+            if (!msg) {
+                el.style.display = 'none';
+                return;
+            }
+            el.textContent = msg;
+            el.style.display = 'block';
+            el.style.color = isSuccess ? 'var(--success-600, #16a34a)' : 'var(--text-secondary, #6b7280)';
+        }
+
         // =============== VALIDATION ===============
         function validate() {
             const fbpn = normalize($('fbpnInput').value);
@@ -550,6 +616,7 @@
             $(id).addEventListener('change', updatePreview);
         });
 
+        $('lookupBolBtn').addEventListener('click', lookupBOL);
         $('generateBtn').addEventListener('click', generateLabels);
         $('resetBtn').addEventListener('click', resetForm);
 
