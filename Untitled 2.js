@@ -1,7 +1,4 @@
-function debugListLibExports() {
-  const res = IMS_LIB.ims_listExportedFunctions();
-  Logger.log(res.names.join('\n'));
-}
+// Debug function removed - library no longer used
 /**
  * Writes skids that exist in BOTH Bin_Stock and Inbound_Staging
  * to a new tab: "Skids_In_Both"
