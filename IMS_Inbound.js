@@ -439,6 +439,7 @@ function processInboundSubmission(payload) {
     if (mIdx('Customer_PO_Number') > -1) mRow[mIdx('Customer_PO_Number')] = basic.customerPO;
     if (mIdx('MFPN') > -1) mRow[mIdx('MFPN')] = item.mfpn;
     if (mIdx('Description') > -1) mRow[mIdx('Description')] = item.description;
+    if (mIdx('Project') > -1) mRow[mIdx('Project')] = item.project;
 
     masterLogRows.push(mRow);
   }

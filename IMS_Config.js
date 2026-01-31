@@ -60,7 +60,7 @@ const TABS = {
   PICK_LOG: "Pick_Log"
 };
 const HEADERS = {
-  "Master_Log": ["Txn_ID", "Date_Received", "Transaction_Type", "Warehouse", "Push #", "FBPN", "Qty_Received", "Total_Skid_Count", "Carrier", "BOL_Number", "Customer_PO_Number", "Manufacturer", "MFPN", "Description", "Received_By", "SKU"],
+  "Master_Log": ["Txn_ID", "Date_Received", "Transaction_Type", "Warehouse", "Project", "Push #", "FBPN", "Qty_Received", "Total_Skid_Count", "Carrier", "BOL_Number", "Customer_PO_Number", "Manufacturer", "MFPN", "Description", "Received_By", "SKU"],
   "Inbound_Skids": ["Skid_ID", "TXN_ID", "Date", "FBPN", "MFPN", "Project", "Qty_on_Skid", "Skid_Sequence", "Is_Mixed", "Timestamp", "SKU"],
   "Inbound_Staging": ["Bin_Code", "Bin_Name", "Push_Number", "FBPN", "Manufacturer", "Project", "Initial_Quantity", "Current_Quantity", "Stock_Percentage", "AUDIT NEEDED", "Skid_ID", "SKU"],
   "OutboundLog": ["Date", "Order_Number", "Task_Number", "Transaction Type", "Warehouse", "Company", "Project", "FBPN", "Manufacturer", "Qty", "Bin_Code", "Skid_ID", "SKU"],
