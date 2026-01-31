@@ -30,6 +30,7 @@ function onOpen(e) {
     .addSeparator()
     .addItem('Inbound Delivery Form', 'openInboundModal')
     .addItem('Inbound Manager (Undo/Labels)', 'openInboundManagerModal')
+    .addItem('Create Skid Label', 'openInboundSkidLabelModal')
     .addSeparator()
     .addSubMenu(customerOrdersMenu)
     .addSeparator()
@@ -1026,6 +1027,86 @@ function getRecentInboundTransactions(limit) { return IMS_LIB.getRecentInboundTr
 function regenerateLabelsForTxn(txnId) { return IMS_LIB.regenerateLabelsForTxn(txnId); }
 function generateManualLabel(data) { return IMS_LIB.generateManualLabel(data); }
 function generateLabelsByBOL(bol) { return IMS_LIB.generateLabelsByBOL(bol); }
+
+// Manual Skid Label Modal Functions
+function openInboundSkidLabelModal() {
+  const html = HtmlService.createTemplateFromFile('InboundSkidLabelModal')
+    .evaluate()
+    .setWidth(850)
+    .setHeight(780);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Create Inbound Skid Label');
+}
+
+function shell_generateManualSkidLabel(data) {
+  // Generate label using the library or local function
+  if (typeof IMS_LIB !== 'undefined' && typeof IMS_LIB.generateManualSkidLabelFromModal === 'function') {
+    return IMS_LIB.generateManualSkidLabelFromModal(data);
+  }
+  // Fallback to local implementation if library doesn't have it
+  return generateManualSkidLabelFromModal(data);
+}
+
+function generateManualSkidLabelFromModal(data) {
+  try {
+    if (!data.fbpn) throw new Error('FBPN is required.');
+    if (!data.qty || data.qty <= 0) throw new Error('Quantity must be greater than 0.');
+    if (!data.manufacturer) throw new Error('Manufacturer is required.');
+    if (!data.project) throw new Error('Project is required.');
+
+    const copies = Math.min(50, Math.max(1, parseInt(data.copies) || 1));
+    const skidNumber = parseInt(data.skidNumber) || 1;
+    const totalSkids = parseInt(data.totalSkids) || 1;
+    const now = new Date();
+    const dateStr = formatDate_(now);
+
+    const labelData = [];
+    for (let i = 0; i < copies; i++) {
+      const skidId = generateRandomId_('SKD-', 8);
+      const sku = generateSKU(data.fbpn, data.manufacturer);
+
+      labelData.push({
+        skidId: skidId,
+        fbpn: String(data.fbpn).toUpperCase().trim(),
+        quantity: data.qty,
+        sku: sku,
+        manufacturer: String(data.manufacturer).trim(),
+        project: String(data.project).trim(),
+        pushNumber: String(data.push || '').trim(),
+        dateReceived: dateStr,
+        skidNumber: skidNumber,
+        totalSkids: totalSkids,
+        notes: String(data.notes || '').trim()
+      });
+    }
+
+    const bolNumber = String(data.bol || 'MANUAL').trim();
+    const result = IMS_LIB.generateSkidLabels(labelData, { bolNumber: bolNumber });
+
+    if (!result || !result.success) {
+      return { success: false, message: (result && result.message) ? result.message : 'Label generation failed.' };
+    }
+
+    return {
+      success: true,
+      pdfUrl: result.pdfUrl || '',
+      htmlUrl: result.htmlUrl || '',
+      labelCount: labelData.length,
+      message: 'Successfully generated ' + labelData.length + ' label(s).'
+    };
+  } catch (err) {
+    Logger.log('generateManualSkidLabelFromModal error: ' + err.toString());
+    return { success: false, message: 'Error: ' + err.message };
+  }
+}
+
+function generateRandomId_(prefix, length) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return prefix + result;
+}
 
 function authenticateUser(email) { return IMS_LIB.authenticateUser(email); }
 function searchInventoryForCustomer(email, criteria) { return IMS_LIB.searchInventoryForCustomer(email, criteria); }
