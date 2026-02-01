@@ -619,3 +619,403 @@ function updateBatchStatus_(cycleSheet, batchId) {
     }
   }
 }
+
+// ============================================================================
+// WEEKLY REPORT FUNCTIONS
+// ============================================================================
+
+/**
+ * Gets cycle count report data for a date range.
+ * @param {Object} params - { startDate, endDate }
+ * @returns {Object} Report data with summary and details
+ */
+function imsGetCycleCountReport(params) {
+  try {
+    const cfg = getCycleConfig_();
+    const ss = SpreadsheetApp.getActive();
+    const cycleSheet = ss.getSheetByName(cfg.CYCLE_COUNT_SHEET);
+
+    if (!cycleSheet) {
+      return { success: false, message: 'Cycle_Count sheet not found.' };
+    }
+
+    const data = cycleSheet.getDataRange().getValues();
+    if (data.length < 2) {
+      return { success: true, summary: getEmptySummary_(), details: [], dateRange: params };
+    }
+
+    const headers = data[0];
+    const idx = {
+      batchId: headers.indexOf('Batch_ID'),
+      status: headers.indexOf('Status'),
+      createdAt: headers.indexOf('Created_At'),
+      createdBy: headers.indexOf('Created_By'),
+      binCode: headers.indexOf('Bin_Code'),
+      fbpn: headers.indexOf('FBPN'),
+      manufacturer: headers.indexOf('Manufacturer'),
+      project: headers.indexOf('Project'),
+      currentQty: headers.indexOf('Current_Qty'),
+      countedQty: headers.indexOf('Counted_Qty'),
+      variance: headers.indexOf('Variance'),
+      notes: headers.indexOf('Notes'),
+      countedAt: headers.indexOf('Counted_At'),
+      countedBy: headers.indexOf('Counted_By')
+    };
+
+    // Parse date range
+    let startDate = null, endDate = null;
+    if (params && params.startDate) {
+      startDate = new Date(params.startDate);
+      startDate.setHours(0, 0, 0, 0);
+    }
+    if (params && params.endDate) {
+      endDate = new Date(params.endDate);
+      endDate.setHours(23, 59, 59, 999);
+    }
+
+    // If no dates provided, default to last 7 days
+    if (!startDate && !endDate) {
+      endDate = new Date();
+      endDate.setHours(23, 59, 59, 999);
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - 7);
+      startDate.setHours(0, 0, 0, 0);
+    }
+
+    const details = [];
+    const batchSummary = {};
+    const binsCounted = new Set();
+    let totalVariance = 0;
+    let positiveVariance = 0;
+    let negativeVariance = 0;
+    let zeroVariance = 0;
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const status = row[idx.status] || '';
+
+      // Only include completed counts
+      if (status !== 'Completed') continue;
+
+      // Check date range
+      const countedAt = row[idx.countedAt];
+      if (!countedAt) continue;
+
+      const countDate = new Date(countedAt);
+      if (isNaN(countDate.getTime())) continue;
+
+      if (startDate && countDate < startDate) continue;
+      if (endDate && countDate > endDate) continue;
+
+      const binCode = row[idx.binCode] || '';
+      const fbpn = row[idx.fbpn] || '';
+      const manufacturer = row[idx.manufacturer] || '';
+      const project = row[idx.project] || '';
+      const currentQty = parseFloat(row[idx.currentQty]) || 0;
+      const countedQty = parseFloat(row[idx.countedQty]) || 0;
+      const variance = parseFloat(row[idx.variance]) || 0;
+      const batchId = row[idx.batchId] || '';
+      const notes = row[idx.notes] || '';
+      const countedBy = row[idx.countedBy] || '';
+
+      // Track variance statistics
+      totalVariance += variance;
+      if (variance > 0) positiveVariance += variance;
+      else if (variance < 0) negativeVariance += Math.abs(variance);
+      else zeroVariance++;
+
+      // Track unique bins
+      binsCounted.add(`${binCode}|${fbpn}|${manufacturer}|${project}`);
+
+      // Track batch summary
+      if (!batchSummary[batchId]) {
+        batchSummary[batchId] = {
+          batchId: batchId,
+          totalLines: 0,
+          completedLines: 0,
+          discrepancies: 0,
+          totalVariance: 0
+        };
+      }
+      batchSummary[batchId].totalLines++;
+      batchSummary[batchId].completedLines++;
+      if (variance !== 0) batchSummary[batchId].discrepancies++;
+      batchSummary[batchId].totalVariance += variance;
+
+      details.push({
+        batchId: batchId,
+        binCode: binCode,
+        fbpn: fbpn,
+        manufacturer: manufacturer,
+        project: project,
+        systemQty: currentQty,
+        countedQty: countedQty,
+        variance: variance,
+        hasDiscrepancy: variance !== 0,
+        notes: notes,
+        countedAt: Utilities.formatDate(countDate, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm'),
+        countedBy: countedBy
+      });
+    }
+
+    // Sort details by date descending
+    details.sort((a, b) => {
+      const da = new Date(a.countedAt);
+      const db = new Date(b.countedAt);
+      return db - da;
+    });
+
+    const discrepancies = details.filter(d => d.hasDiscrepancy);
+
+    const summary = {
+      totalBinsAudited: binsCounted.size,
+      totalLinesCompleted: details.length,
+      totalDiscrepancies: discrepancies.length,
+      discrepancyRate: details.length > 0 ? ((discrepancies.length / details.length) * 100).toFixed(1) : 0,
+      totalVariance: totalVariance,
+      positiveVariance: positiveVariance,
+      negativeVariance: negativeVariance,
+      accurateCount: zeroVariance,
+      batchCount: Object.keys(batchSummary).length,
+      batches: Object.values(batchSummary)
+    };
+
+    return {
+      success: true,
+      summary: summary,
+      details: details,
+      discrepancies: discrepancies,
+      dateRange: {
+        start: startDate ? Utilities.formatDate(startDate, Session.getScriptTimeZone(), 'MM/dd/yyyy') : '',
+        end: endDate ? Utilities.formatDate(endDate, Session.getScriptTimeZone(), 'MM/dd/yyyy') : ''
+      }
+    };
+
+  } catch (err) {
+    Logger.log('imsGetCycleCountReport error: ' + err.toString());
+    return { success: false, message: 'Error generating report: ' + err.message };
+  }
+}
+
+/**
+ * Returns an empty summary structure.
+ */
+function getEmptySummary_() {
+  return {
+    totalBinsAudited: 0,
+    totalLinesCompleted: 0,
+    totalDiscrepancies: 0,
+    discrepancyRate: 0,
+    totalVariance: 0,
+    positiveVariance: 0,
+    negativeVariance: 0,
+    accurateCount: 0,
+    batchCount: 0,
+    batches: []
+  };
+}
+
+/**
+ * Generates a PDF report for cycle count data.
+ * @param {Object} params - { startDate, endDate }
+ * @returns {Object} { success, pdfUrl, message }
+ */
+function imsGenerateCycleCountReportPdf(params) {
+  try {
+    const reportData = imsGetCycleCountReport(params);
+    if (!reportData.success) {
+      return reportData;
+    }
+
+    const html = buildCycleCountReportHtml_(reportData);
+
+    // Create temp HTML file and convert to PDF
+    const tempFolder = DriveApp.getRootFolder();
+    const fileName = `Cycle_Count_Report_${reportData.dateRange.start}_to_${reportData.dateRange.end}`.replace(/\//g, '-');
+
+    const htmlBlob = Utilities.newBlob(html, 'text/html', fileName + '.html');
+    const pdfBlob = htmlBlob.getAs('application/pdf');
+    pdfBlob.setName(fileName + '.pdf');
+
+    const pdfFile = tempFolder.createFile(pdfBlob);
+
+    return {
+      success: true,
+      pdfUrl: pdfFile.getUrl(),
+      message: 'Report generated successfully.'
+    };
+
+  } catch (err) {
+    Logger.log('imsGenerateCycleCountReportPdf error: ' + err.toString());
+    return { success: false, message: 'Error generating PDF: ' + err.message };
+  }
+}
+
+/**
+ * Builds HTML for the cycle count report.
+ */
+function buildCycleCountReportHtml_(reportData) {
+  const s = reportData.summary;
+  const dateRange = reportData.dateRange;
+
+  let discrepancyRows = '';
+  if (reportData.discrepancies && reportData.discrepancies.length > 0) {
+    reportData.discrepancies.forEach(d => {
+      const varClass = d.variance > 0 ? 'positive' : 'negative';
+      const varSign = d.variance > 0 ? '+' : '';
+      discrepancyRows += `
+        <tr>
+          <td>${d.binCode}</td>
+          <td>${d.fbpn}</td>
+          <td>${d.manufacturer}</td>
+          <td>${d.project}</td>
+          <td style="text-align:right">${d.systemQty}</td>
+          <td style="text-align:right">${d.countedQty}</td>
+          <td style="text-align:right" class="${varClass}">${varSign}${d.variance}</td>
+          <td>${d.notes || '-'}</td>
+          <td>${d.countedAt}</td>
+          <td>${d.countedBy}</td>
+        </tr>`;
+    });
+  } else {
+    discrepancyRows = '<tr><td colspan="10" style="text-align:center; color:#888;">No discrepancies found in this period.</td></tr>';
+  }
+
+  let allAuditsRows = '';
+  if (reportData.details && reportData.details.length > 0) {
+    reportData.details.forEach(d => {
+      const varClass = d.variance > 0 ? 'positive' : (d.variance < 0 ? 'negative' : 'zero');
+      const varSign = d.variance > 0 ? '+' : '';
+      allAuditsRows += `
+        <tr>
+          <td>${d.binCode}</td>
+          <td>${d.fbpn}</td>
+          <td>${d.manufacturer}</td>
+          <td>${d.project}</td>
+          <td style="text-align:right">${d.systemQty}</td>
+          <td style="text-align:right">${d.countedQty}</td>
+          <td style="text-align:right" class="${varClass}">${varSign}${d.variance}</td>
+          <td>${d.countedAt}</td>
+        </tr>`;
+    });
+  } else {
+    allAuditsRows = '<tr><td colspan="8" style="text-align:center; color:#888;">No audits completed in this period.</td></tr>';
+  }
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Cycle Count Report</title>
+  <style>
+    @page { size: landscape; margin: 0.5in; }
+    body { font-family: Arial, sans-serif; font-size: 10pt; color: #333; margin: 0; padding: 20px; }
+    h1 { font-size: 18pt; color: #1a1a1a; margin-bottom: 5px; }
+    h2 { font-size: 14pt; color: #333; margin-top: 25px; margin-bottom: 10px; border-bottom: 2px solid #2563eb; padding-bottom: 5px; }
+    .date-range { color: #666; font-size: 11pt; margin-bottom: 20px; }
+    .summary-grid { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 25px; }
+    .summary-card { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px 16px; min-width: 140px; }
+    .summary-card .label { font-size: 9pt; color: #666; text-transform: uppercase; margin-bottom: 4px; }
+    .summary-card .value { font-size: 18pt; font-weight: 700; color: #1a1a1a; }
+    .summary-card .value.positive { color: #16a34a; }
+    .summary-card .value.negative { color: #dc2626; }
+    .summary-card .value.warning { color: #d97706; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th { background: #2563eb; color: white; padding: 8px 10px; text-align: left; font-size: 9pt; text-transform: uppercase; }
+    td { padding: 6px 10px; border-bottom: 1px solid #e0e0e0; font-size: 9pt; }
+    tr:nth-child(even) { background: #f8f9fa; }
+    .positive { color: #16a34a; font-weight: 600; }
+    .negative { color: #dc2626; font-weight: 600; }
+    .zero { color: #666; }
+    .page-break { page-break-before: always; }
+    .footer { margin-top: 30px; font-size: 8pt; color: #999; text-align: center; }
+  </style>
+</head>
+<body>
+  <h1>Cycle Count Weekly Report</h1>
+  <div class="date-range">Report Period: ${dateRange.start} to ${dateRange.end}</div>
+
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="label">Bins Audited</div>
+      <div class="value">${s.totalBinsAudited}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Lines Completed</div>
+      <div class="value">${s.totalLinesCompleted}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Discrepancies</div>
+      <div class="value ${s.totalDiscrepancies > 0 ? 'warning' : ''}">${s.totalDiscrepancies}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Accuracy Rate</div>
+      <div class="value ${parseFloat(s.discrepancyRate) > 10 ? 'negative' : 'positive'}">${(100 - parseFloat(s.discrepancyRate)).toFixed(1)}%</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Net Variance</div>
+      <div class="value ${s.totalVariance > 0 ? 'positive' : (s.totalVariance < 0 ? 'negative' : '')}">${s.totalVariance > 0 ? '+' : ''}${s.totalVariance}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Over (+)</div>
+      <div class="value positive">+${s.positiveVariance}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Short (-)</div>
+      <div class="value negative">-${s.negativeVariance}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Batches</div>
+      <div class="value">${s.batchCount}</div>
+    </div>
+  </div>
+
+  <h2>Discrepancies</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Bin</th>
+        <th>FBPN</th>
+        <th>Manufacturer</th>
+        <th>Project</th>
+        <th>System Qty</th>
+        <th>Counted Qty</th>
+        <th>Variance</th>
+        <th>Notes</th>
+        <th>Counted At</th>
+        <th>Counted By</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${discrepancyRows}
+    </tbody>
+  </table>
+
+  <div class="page-break"></div>
+
+  <h2>All Audits Completed</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Bin</th>
+        <th>FBPN</th>
+        <th>Manufacturer</th>
+        <th>Project</th>
+        <th>System Qty</th>
+        <th>Counted Qty</th>
+        <th>Variance</th>
+        <th>Counted At</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${allAuditsRows}
+    </tbody>
+  </table>
+
+  <div class="footer">
+    Generated on ${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm:ss')}
+  </div>
+</body>
+</html>`;
+}
+

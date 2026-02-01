@@ -538,6 +538,7 @@ function onOpen(e) {
     .addItem('Inbound Delivery Form', 'openInboundModal')
     .addItem('Inbound Manager (Undo/Labels)', 'openInboundManagerModal')
     .addItem('Create Skid Label', 'openInboundSkidLabelModal')
+    .addItem('Batch Label Generator', 'openBatchLabelGeneratorModal')
     .addSeparator()
     .addSubMenu(customerOrdersMenu)
     .addSeparator()
@@ -669,6 +670,14 @@ function openInboundSkidLabelModal() {
   SpreadsheetApp.getUi().showModalDialog(html, 'Create Inbound Skid Label');
 }
 
+function openBatchLabelGeneratorModal() {
+  const html = HtmlService.createTemplateFromFile('BatchLabelGenerator')
+    .evaluate()
+    .setWidth(1100)
+    .setHeight(700);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Batch Label Generator');
+}
+
 // ----------------------------------------------------------------------------
 // SHELL WRAPPER FUNCTIONS
 // Note: Most functions are implemented in their respective modules:
@@ -685,6 +694,361 @@ function openInboundSkidLabelModal() {
 function shell_generateLabelsForAllPastInbounds(startDate, endDate) {
   if (!startDate) throw new Error('startDate is required');
   return generateLabelsForAllPastInbounds(startDate, endDate || startDate);
+}
+
+// ----------------------------------------------------------------------------
+// BATCH LABEL GENERATION FUNCTIONS
+// ----------------------------------------------------------------------------
+
+/**
+ * Gets all BOLs from Master_Log with their label status for the batch generator modal.
+ * Checks if label files exist in the corresponding Drive folder.
+ */
+function shell_getBolsForLabelGeneration() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const masterSheet = ss.getSheetByName('Master_Log');
+    const skidsSheet = ss.getSheetByName('Inbound_Skids');
+
+    if (!masterSheet) {
+      return { success: false, message: 'Master_Log sheet not found.' };
+    }
+
+    const mData = masterSheet.getDataRange().getValues();
+    const sData = skidsSheet ? skidsSheet.getDataRange().getValues() : [];
+
+    const mHead = mData[0];
+    const mCol = (n) => mHead.indexOf(n);
+
+    const mTxn = mCol('Txn_ID');
+    const mDate = mCol('Date_Received');
+    const mBol = mCol('BOL_Number');
+    const mFbpn = mCol('FBPN');
+    const mMan = mCol('Manufacturer');
+    const mProj = mCol('Project');
+
+    if (mTxn < 0 || mBol < 0) {
+      return { success: false, message: 'Master_Log missing required columns (Txn_ID, BOL_Number).' };
+    }
+
+    // Count skids per TXN_ID from Inbound_Skids
+    const skidCounts = {};
+    if (sData.length > 1) {
+      const sHead = sData[0];
+      const sTxn = sHead.indexOf('TXN_ID');
+      if (sTxn >= 0) {
+        for (let i = 1; i < sData.length; i++) {
+          const txnId = String(sData[i][sTxn] || '').trim();
+          if (txnId) {
+            skidCounts[txnId] = (skidCounts[txnId] || 0) + 1;
+          }
+        }
+      }
+    }
+
+    // Get root folder for checking label existence
+    const rootFolderId = (typeof FOLDERS !== 'undefined' && FOLDERS.INBOUND_UPLOADS)
+      ? FOLDERS.INBOUND_UPLOADS
+      : null;
+
+    // Build BOL list with unique TXN_ID + BOL combinations
+    const bolMap = new Map();
+
+    for (let i = 1; i < mData.length; i++) {
+      const txnId = String(mData[i][mTxn] || '').trim();
+      const bol = String(mData[i][mBol] || '').trim();
+
+      if (!txnId || !bol) continue;
+
+      const key = `${txnId}|${bol}`;
+      if (bolMap.has(key)) continue;
+
+      const dateVal = mData[i][mDate];
+      let dateStr = '';
+      if (dateVal) {
+        try {
+          const d = (dateVal instanceof Date) ? dateVal : new Date(dateVal);
+          if (!isNaN(d.getTime())) {
+            dateStr = Utilities.formatDate(d, Session.getScriptTimeZone(), 'MM/dd/yyyy');
+          }
+        } catch (e) {
+          dateStr = String(dateVal);
+        }
+      }
+
+      bolMap.set(key, {
+        key: key,
+        txnId: txnId,
+        bol: bol,
+        dateStr: dateStr,
+        dateVal: dateVal,
+        fbpn: mFbpn >= 0 ? String(mData[i][mFbpn] || '') : '',
+        manufacturer: mMan >= 0 ? String(mData[i][mMan] || '') : '',
+        project: mProj >= 0 ? String(mData[i][mProj] || '') : '',
+        skidCount: skidCounts[txnId] || 0,
+        hasLabels: false
+      });
+    }
+
+    // Check label existence for each BOL
+    const bols = Array.from(bolMap.values());
+
+    if (rootFolderId) {
+      try {
+        const rootFolder = DriveApp.getFolderById(rootFolderId);
+
+        for (const bolData of bols) {
+          try {
+            const hasLabels = checkLabelsExist_(rootFolder, bolData.dateVal, bolData.bol);
+            bolData.hasLabels = hasLabels;
+          } catch (e) {
+            // If we can't check, mark as unknown (false)
+            bolData.hasLabels = false;
+          }
+        }
+      } catch (e) {
+        Logger.log('Could not access root folder for label checking: ' + e);
+      }
+    }
+
+    // Sort by date descending
+    bols.sort((a, b) => {
+      const da = a.dateVal ? new Date(a.dateVal) : new Date(0);
+      const db = b.dateVal ? new Date(b.dateVal) : new Date(0);
+      return db - da;
+    });
+
+    return { success: true, bols: bols };
+
+  } catch (err) {
+    Logger.log('shell_getBolsForLabelGeneration error: ' + err.toString());
+    return { success: false, message: 'Error: ' + err.message };
+  }
+}
+
+/**
+ * Checks if label files exist in the BOL folder.
+ */
+function checkLabelsExist_(rootFolder, dateVal, bol) {
+  if (!dateVal || !bol) return false;
+
+  try {
+    const d = (dateVal instanceof Date) ? dateVal : new Date(dateVal);
+    if (isNaN(d.getTime())) return false;
+
+    // Build folder path: {MonthYear}/{Day}/{BOL}
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthYear = months[d.getMonth()] + ' ' + d.getFullYear();
+    const day = String(d.getDate()).padStart(2, '0');
+    const safeBol = String(bol).trim().replace(/[\/\\?%*:|"<>\.]/g, '_');
+
+    // Navigate to month folder
+    const monthFolders = rootFolder.getFoldersByName(monthYear);
+    if (!monthFolders.hasNext()) return false;
+    const monthFolder = monthFolders.next();
+
+    // Navigate to day folder
+    const dayFolders = monthFolder.getFoldersByName(day);
+    if (!dayFolders.hasNext()) return false;
+    const dayFolder = dayFolders.next();
+
+    // Navigate to BOL folder
+    const bolFolders = dayFolder.getFoldersByName(safeBol);
+    if (!bolFolders.hasNext()) return false;
+    const bolFolder = bolFolders.next();
+
+    // Check for label files (Labels_*.html or Labels_*.pdf)
+    const files = bolFolder.getFiles();
+    while (files.hasNext()) {
+      const file = files.next();
+      const name = file.getName().toLowerCase();
+      if (name.startsWith('labels_') && (name.endsWith('.html') || name.endsWith('.pdf'))) {
+        return true;
+      }
+    }
+
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Generates labels for a specific BOL/Transaction.
+ */
+function shell_generateLabelsForBol(txnId, bolNumber) {
+  try {
+    if (!txnId) {
+      return { success: false, message: 'Transaction ID is required.' };
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const masterSheet = ss.getSheetByName('Master_Log');
+    const skidsSheet = ss.getSheetByName('Inbound_Skids');
+
+    if (!masterSheet || !skidsSheet) {
+      return { success: false, message: 'Required sheets not found.' };
+    }
+
+    const mData = masterSheet.getDataRange().getValues();
+    const sData = skidsSheet.getDataRange().getValues();
+
+    // Get Master_Log headers and columns
+    const mHead = mData[0];
+    const mCol = (n) => mHead.indexOf(n);
+    const mTxn = mCol('Txn_ID');
+    const mDate = mCol('Date_Received');
+    const mBol = mCol('BOL_Number');
+    const mPush = mCol('Push #');
+    const mMan = mCol('Manufacturer');
+
+    // Get Inbound_Skids headers and columns
+    const sHead = sData[0];
+    const sCol = (n) => sHead.indexOf(n);
+    const sTxn = sCol('TXN_ID');
+    const sSkid = sCol('Skid_ID');
+    const sFbpn = sCol('FBPN');
+    const sQty = sCol('Qty_on_Skid');
+    const sSku = sCol('SKU');
+    const sProj = sCol('Project');
+    const sSeq = sCol('Skid_Sequence');
+
+    // Find the master record for this transaction
+    let masterRecord = null;
+    for (let i = 1; i < mData.length; i++) {
+      if (String(mData[i][mTxn] || '').trim() === txnId) {
+        masterRecord = {
+          date: mData[i][mDate],
+          bol: mBol >= 0 ? mData[i][mBol] : bolNumber,
+          push: mPush >= 0 ? mData[i][mPush] : '',
+          manufacturer: mMan >= 0 ? mData[i][mMan] : ''
+        };
+        break;
+      }
+    }
+
+    if (!masterRecord) {
+      return { success: false, message: 'Transaction not found in Master_Log.' };
+    }
+
+    // Get all skids for this transaction
+    const skids = [];
+    for (let i = 1; i < sData.length; i++) {
+      if (String(sData[i][sTxn] || '').trim() === txnId) {
+        skids.push({
+          skidId: sSkid >= 0 ? sData[i][sSkid] : '',
+          fbpn: sFbpn >= 0 ? sData[i][sFbpn] : '',
+          qty: sQty >= 0 ? sData[i][sQty] : 0,
+          sku: sSku >= 0 ? sData[i][sSku] : '',
+          project: sProj >= 0 ? sData[i][sProj] : '',
+          skidSeq: sSeq >= 0 ? (sData[i][sSeq] || 1) : 1
+        });
+      }
+    }
+
+    if (skids.length === 0) {
+      return { success: false, message: 'No skids found for this transaction in Inbound_Skids.' };
+    }
+
+    // Build label data
+    const totalSkids = skids.length;
+    const labelData = skids.map(skid => ({
+      skidId: skid.skidId,
+      fbpn: skid.fbpn,
+      quantity: skid.qty,
+      sku: skid.sku,
+      manufacturer: masterRecord.manufacturer,
+      project: skid.project,
+      pushNumber: masterRecord.push,
+      dateReceived: formatLabelDate_(masterRecord.date),
+      skidNumber: skid.skidSeq,
+      totalSkids: totalSkids
+    }));
+
+    // Create target folder
+    let targetFolder = null;
+    try {
+      const d = (masterRecord.date instanceof Date) ? masterRecord.date : new Date(masterRecord.date);
+      if (!isNaN(d.getTime())) {
+        targetFolder = createInboundFolder_(d, masterRecord.bol);
+      }
+    } catch (e) {
+      Logger.log('Could not create target folder: ' + e);
+    }
+
+    // Generate labels
+    const result = generateSkidLabels(labelData, {
+      bolNumber: masterRecord.bol,
+      targetFolder: targetFolder
+    });
+
+    if (result && result.success) {
+      return {
+        success: true,
+        message: `Generated ${labelData.length} label(s) for BOL ${masterRecord.bol}`,
+        pdfUrl: result.pdfUrl,
+        htmlUrl: result.htmlUrl,
+        labelCount: labelData.length
+      };
+    } else {
+      return { success: false, message: result.message || 'Label generation failed.' };
+    }
+
+  } catch (err) {
+    Logger.log('shell_generateLabelsForBol error: ' + err.toString());
+    return { success: false, message: 'Error: ' + err.message };
+  }
+}
+
+/**
+ * Helper to format date for labels.
+ */
+function formatLabelDate_(dateVal) {
+  if (!dateVal) return '';
+  try {
+    const d = (dateVal instanceof Date) ? dateVal : new Date(dateVal);
+    if (isNaN(d.getTime())) return String(dateVal);
+    return Utilities.formatDate(d, Session.getScriptTimeZone(), 'MM/dd/yyyy');
+  } catch (e) {
+    return String(dateVal);
+  }
+}
+
+/**
+ * Creates the inbound folder structure: Inbound_Uploads/{MonthYear}/{Day}/{BOL}
+ */
+function createInboundFolder_(date, bolNumber) {
+  const rootId = (typeof FOLDERS !== 'undefined' && FOLDERS.INBOUND_UPLOADS)
+    ? FOLDERS.INBOUND_UPLOADS
+    : FOLDERS.IMS_ROOT;
+
+  const rootFolder = DriveApp.getFolderById(rootId);
+
+  // Month folder (e.g., "Jan 2024")
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthYear = months[date.getMonth()] + ' ' + date.getFullYear();
+  const monthFolder = getOrCreateSubfolder_(rootFolder, monthYear);
+
+  // Day folder (e.g., "15")
+  const day = String(date.getDate()).padStart(2, '0');
+  const dayFolder = getOrCreateSubfolder_(monthFolder, day);
+
+  // BOL folder
+  const safeBol = String(bolNumber || 'NO_BOL').trim().replace(/[\/\\?%*:|"<>\.]/g, '_');
+  const bolFolder = getOrCreateSubfolder_(dayFolder, safeBol);
+
+  return bolFolder;
+}
+
+/**
+ * Gets or creates a subfolder.
+ */
+function getOrCreateSubfolder_(parentFolder, name) {
+  const folders = parentFolder.getFoldersByName(name);
+  if (folders.hasNext()) {
+    return folders.next();
+  }
+  return parentFolder.createFolder(name);
 }
 
 // ----------------------------------------------------------------------------

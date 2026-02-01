@@ -4,7 +4,45 @@
   <base target="_top">
   <?!= include('UniversalStyles'); ?>
   <style>
-    /* Professional Dark Theme Overrides */
+    /* Tab Navigation */
+    .tab-nav {
+      display: flex;
+      border-bottom: 2px solid var(--border-color);
+      margin-bottom: 20px;
+    }
+
+    .tab-btn {
+      padding: 12px 24px;
+      border: none;
+      background: transparent;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      background: var(--bg-hover);
+    }
+
+    .tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Summary Section */
     .summary-section {
       background: var(--bg-surface);
       border: 1px solid var(--border-color);
@@ -32,7 +70,7 @@
       font-weight: 700;
     }
 
-    /* Single Bin Card Focused Layout */
+    /* Bin Card for Count Tab */
     .bin-card {
       background: var(--bg-surface);
       border: 1px solid var(--border-color);
@@ -58,43 +96,43 @@
       font-weight: 700;
       color: var(--text-main);
     }
-    
+
     .current-info-panel {
-        background: var(--bg-body);
-        border: 1px dashed var(--border-color);
-        border-radius: var(--radius-sm);
-        padding: 12px;
-        margin-bottom: 20px;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
+      background: var(--bg-body);
+      border: 1px dashed var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      margin-bottom: 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
     }
-    
+
     .info-block label {
-        font-size: 0.7rem;
-        color: var(--text-muted);
-        text-transform: uppercase;
-        display: block;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      display: block;
     }
     .info-block div {
-        font-weight: 600;
-        font-size: 0.95rem;
-        color: var(--text-secondary);
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--text-secondary);
     }
 
     .input-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 16px;
-        margin-bottom: 16px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
     }
-    
+
     .count-section {
-        background: rgba(16, 185, 129, 0.1); /* Subtle green tint */
-        border: 1px solid var(--success);
-        padding: 16px;
-        border-radius: var(--radius-md);
-        margin-top: 20px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid var(--success);
+      padding: 16px;
+      border-radius: var(--radius-md);
+      margin-top: 20px;
     }
 
     .count-input {
@@ -104,10 +142,130 @@
       text-align: center;
       border: 2px solid var(--border-color);
     }
-    
+
     .count-input:focus {
-        border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(0,0,0,0.1);
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(0,0,0,0.1);
+    }
+
+    /* Report Tab Styles */
+    .report-controls {
+      display: flex;
+      gap: 16px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+      padding: 16px;
+      background: var(--bg-surface);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+    }
+
+    .report-controls .form-group {
+      margin: 0;
+    }
+
+    .report-controls .form-label {
+      margin-bottom: 6px;
+    }
+
+    .quick-select-btns {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .quick-select-btns button {
+      padding: 6px 12px;
+      font-size: 0.8rem;
+    }
+
+    .summary-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .summary-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      text-align: center;
+    }
+
+    .summary-card .label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .summary-card .value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .summary-card .value.positive { color: var(--success); }
+    .summary-card .value.negative { color: var(--danger); }
+    .summary-card .value.warning { color: #d97706; }
+
+    .report-section {
+      margin-bottom: 24px;
+    }
+
+    .report-section h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--primary);
+    }
+
+    .report-table-wrap {
+      overflow-x: auto;
+      max-height: 350px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+    }
+
+    .report-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    .report-table th {
+      background: var(--bg-secondary);
+      padding: 10px 12px;
+      text-align: left;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .report-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .report-table tr:hover {
+      background: var(--bg-hover);
+    }
+
+    .variance-positive { color: var(--success); font-weight: 600; }
+    .variance-negative { color: var(--danger); font-weight: 600; }
+    .variance-zero { color: var(--text-muted); }
+
+    .no-data {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
     }
 
     /* Loading Overlay */
@@ -132,24 +290,49 @@
     let currentIndex = 0;
     let manufacturers = [];
     let projects = [];
+    let currentReport = null;
 
     // Initialize on load
     window.onload = function() {
       setLoading(true, 'Initializing...');
       loadDependencies();
+
+      // Set default date range for report (last 7 days)
+      const today = new Date();
+      const weekAgo = new Date();
+      weekAgo.setDate(today.getDate() - 7);
+
+      document.getElementById('reportEndDate').value = formatDateInput(today);
+      document.getElementById('reportStartDate').value = formatDateInput(weekAgo);
     };
-    
+
+    function formatDateInput(date) {
+      return date.toISOString().split('T')[0];
+    }
+
+    // Tab switching
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+
+      document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+      document.getElementById(`tab-${tabName}`).classList.add('active');
+
+      if (tabName === 'report' && !currentReport) {
+        loadReport();
+      }
+    }
+
     function loadDependencies() {
-        // Chain loading dependencies: Manufacturers -> Projects -> Bins
-        google.script.run.withSuccessHandler(m => {
-            manufacturers = m || [];
-            
-            google.script.run.withSuccessHandler(p => {
-                projects = p || [];
-                loadCycleCount(); // Finally load bins
-            }).withFailureHandler(onFailure).getProjects();
-            
-        }).withFailureHandler(onFailure).getManufacturers();
+      google.script.run.withSuccessHandler(m => {
+        manufacturers = m || [];
+
+        google.script.run.withSuccessHandler(p => {
+          projects = p || [];
+          loadCycleCount();
+        }).withFailureHandler(onFailure).getProjects();
+
+      }).withFailureHandler(onFailure).getManufacturers();
     }
 
     function loadCycleCount() {
@@ -164,7 +347,6 @@
       setLoading(false);
       let bins = [];
 
-      // Robust response handling
       if (Array.isArray(response)) {
         bins = response;
       } else if (response && Array.isArray(response.bins)) {
@@ -175,11 +357,10 @@
         return showAlert('Error loading bins: ' + (response.message || 'Unknown error'), 'danger');
       }
 
-      // Sort bins by Bin_Code (Alphanumeric sort)
       bins.sort((a, b) => {
-          const codeA = (a.binCode || a.Bin_Code || '').toString();
-          const codeB = (b.binCode || b.Bin_Code || '').toString();
-          return codeA.localeCompare(codeB, undefined, {numeric: true, sensitivity: 'base'});
+        const codeA = (a.binCode || a.Bin_Code || '').toString();
+        const codeB = (b.binCode || b.Bin_Code || '').toString();
+        return codeA.localeCompare(codeB, undefined, {numeric: true, sensitivity: 'base'});
       });
 
       binsQueue = bins;
@@ -190,37 +371,34 @@
     function renderCurrentBin() {
       const container = document.getElementById('binContent');
       const progressDiv = document.getElementById('currentRows');
-      
-      // Check for completion
+
       if (currentIndex >= binsQueue.length) {
-          if (binsQueue.length === 0) {
-              container.innerHTML = `
-                  <div style="text-align: center; padding: 60px 20px;">
-                      <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
-                      <h3 style="color: var(--text-main);">No Bins Found</h3>
-                      <p style="color: var(--text-muted);">No inventory bins matched the criteria.</p>
-                      <button class="btn btn-primary mt-3" onclick="loadCycleCount()">Refresh</button>
-                  </div>`;
-              progressDiv.textContent = "0";
-          } else {
-              container.innerHTML = `
-                  <div style="text-align: center; padding: 60px 20px;">
-                      <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
-                      <h3 style="color: var(--text-main);">Cycle Count Complete!</h3>
-                      <p style="color: var(--text-muted);">You have processed all ${binsQueue.length} bins.</p>
-                      <button class="btn btn-primary mt-3" onclick="loadCycleCount()">Start New Batch</button>
-                  </div>`;
-              progressDiv.textContent = "Done";
-          }
-          return;
+        if (binsQueue.length === 0) {
+          container.innerHTML = `
+            <div style="text-align: center; padding: 60px 20px;">
+              <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
+              <h3 style="color: var(--text-main);">No Bins Found</h3>
+              <p style="color: var(--text-muted);">No inventory bins matched the criteria.</p>
+              <button class="btn btn-primary mt-3" onclick="loadCycleCount()">Refresh</button>
+            </div>`;
+          progressDiv.textContent = "0";
+        } else {
+          container.innerHTML = `
+            <div style="text-align: center; padding: 60px 20px;">
+              <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
+              <h3 style="color: var(--text-main);">Cycle Count Complete!</h3>
+              <p style="color: var(--text-muted);">You have processed all ${binsQueue.length} bins.</p>
+              <button class="btn btn-primary mt-3" onclick="loadCycleCount()">Start New Batch</button>
+            </div>`;
+          progressDiv.textContent = "Done";
+        }
+        return;
       }
-      
-      // Update Progress
+
       progressDiv.textContent = `${currentIndex + 1} / ${binsQueue.length}`;
-      
+
       const bin = binsQueue[currentIndex];
-      
-      // Extract values with fallbacks
+
       const binCode = bin.binCode || bin.Bin_Code || 'Unknown';
       const curFbpn = bin.fbpn || bin.FBPN || '';
       const curMfr = bin.manufacturer || bin.Manufacturer || '';
@@ -228,75 +406,72 @@
       const curPush = bin.pushNumber || bin.Push_Number || '';
       const sysQty = bin.currentQty !== undefined ? bin.currentQty : (bin.Current_Quantity || 0);
 
-      // Build Options for Dropdowns
       let mfrOpts = `<option value="">Select Manufacturer...</option>`;
       manufacturers.forEach(m => {
-          mfrOpts += `<option value="${m}" ${m === curMfr ? 'selected' : ''}>${m}</option>`;
-      });
-      
-      let projOpts = `<option value="">Select Project...</option>`;
-      projects.forEach(p => {
-          projOpts += `<option value="${p}" ${p === curProj ? 'selected' : ''}>${p}</option>`;
+        mfrOpts += `<option value="${m}" ${m === curMfr ? 'selected' : ''}>${m}</option>`;
       });
 
-      // Render Card
+      let projOpts = `<option value="">Select Project...</option>`;
+      projects.forEach(p => {
+        projOpts += `<option value="${p}" ${p === curProj ? 'selected' : ''}>${p}</option>`;
+      });
+
       container.innerHTML = `
         <div class="bin-card">
           <div class="bin-header">
             <div class="bin-code">${binCode}</div>
             <div style="text-align:right">
-                <span class="text-muted" style="font-size:0.8rem">System Qty</span><br>
-                <span style="font-size:1.2rem; font-weight:bold;">${sysQty}</span>
+              <span class="text-muted" style="font-size:0.8rem">System Qty</span><br>
+              <span style="font-size:1.2rem; font-weight:bold;">${sysQty}</span>
             </div>
           </div>
-          
+
           <div class="current-info-panel">
-             <div class="info-block"><label>Current FBPN</label><div>${curFbpn || '-'}</div></div>
-             <div class="info-block"><label>Current Push #</label><div>${curPush || '-'}</div></div>
-             <div class="info-block"><label>Current Mfr</label><div>${curMfr || '-'}</div></div>
-             <div class="info-block"><label>Current Project</label><div>${curProj || '-'}</div></div>
+            <div class="info-block"><label>Current FBPN</label><div>${curFbpn || '-'}</div></div>
+            <div class="info-block"><label>Current Push #</label><div>${curPush || '-'}</div></div>
+            <div class="info-block"><label>Current Mfr</label><div>${curMfr || '-'}</div></div>
+            <div class="info-block"><label>Current Project</label><div>${curProj || '-'}</div></div>
           </div>
 
           <div class="form-section-title" style="font-size:0.9rem; margin-bottom:10px;">Correction / Verification</div>
-          
+
           <div class="input-grid">
-             <div class="form-group">
-               <label class="form-label">Corrected FBPN</label>
-               <input id="inputFbpn" class="form-input" value="${curFbpn}">
-             </div>
-             <div class="form-group">
-               <label class="form-label">Push Number</label>
-               <input id="inputPush" class="form-input" value="${curPush}">
-             </div>
+            <div class="form-group">
+              <label class="form-label">Corrected FBPN</label>
+              <input id="inputFbpn" class="form-input" value="${curFbpn}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Push Number</label>
+              <input id="inputPush" class="form-input" value="${curPush}">
+            </div>
           </div>
-          
+
           <div class="input-grid">
-             <div class="form-group">
-               <label class="form-label">Manufacturer</label>
-               <select id="inputMfr" class="form-select">${mfrOpts}</select>
-             </div>
-             <div class="form-group">
-               <label class="form-label">Project</label>
-               <select id="inputProj" class="form-select">${projOpts}</select>
-             </div>
+            <div class="form-group">
+              <label class="form-label">Manufacturer</label>
+              <select id="inputMfr" class="form-select">${mfrOpts}</select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Project</label>
+              <select id="inputProj" class="form-select">${projOpts}</select>
+            </div>
           </div>
 
           <div class="count-section">
             <label class="form-label required" style="color:var(--primary); text-align:center; font-size:1rem;">Physical Count</label>
             <input type="number" id="inputCount" class="form-input count-input" placeholder="0" autofocus onkeypress="handleEnter(event)">
           </div>
-          
+
           <div class="button-group">
             <button class="btn btn-secondary" onclick="skipBin()">Skip Bin</button>
             <button class="btn btn-success btn-large" onclick="submitCurrentBin()">Confirm & Next</button>
           </div>
         </div>
       `;
-      
-      // Auto-focus the count input for speed
+
       setTimeout(() => {
-          const input = document.getElementById('inputCount');
-          if(input) input.focus();
+        const input = document.getElementById('inputCount');
+        if(input) input.focus();
       }, 100);
     }
 
@@ -308,7 +483,7 @@
         showAlert('Please enter a count quantity', 'warning');
         return;
       }
-      
+
       const countedQty = parseInt(countVal);
       if (isNaN(countedQty) || countedQty < 0) {
         showAlert('Please enter a valid non-negative number', 'warning');
@@ -319,20 +494,15 @@
 
       const payload = {
         binCode: bin.binCode || bin.Bin_Code,
-        
-        // System / Original values for reference/variance calc
         originalFbpn: bin.fbpn || bin.FBPN,
         originalManufacturer: bin.manufacturer || bin.Manufacturer,
         originalProject: bin.project || bin.Project,
         currentQty: bin.currentQty !== undefined ? bin.currentQty : (bin.Current_Quantity || 0),
-        
-        // User inputs
         countedQty: countedQty,
         correctedFbpn: document.getElementById('inputFbpn').value,
         pushNumber: document.getElementById('inputPush').value,
         manufacturer: document.getElementById('inputMfr').value,
         project: document.getElementById('inputProj').value,
-        
         timestamp: new Date().toISOString()
       };
 
@@ -348,16 +518,15 @@
           }
         })
         .withFailureHandler(function(error) {
-          console.error('Submit Error:', error);
           setLoading(false);
           showAlert('Server error: ' + error.message, 'danger');
         })
         .imsSubmitCycleCountLine(payload);
     }
-    
+
     function skipBin() {
-        currentIndex++;
-        renderCurrentBin();
+      currentIndex++;
+      renderCurrentBin();
     }
 
     function handleEnter(event) {
@@ -366,17 +535,148 @@
       }
     }
 
-    function onFailure(error) {
-      console.error('Load Error:', error);
+    // Report Functions
+    function setQuickDate(days) {
+      const today = new Date();
+      const pastDate = new Date();
+      pastDate.setDate(today.getDate() - days);
+
+      document.getElementById('reportEndDate').value = formatDateInput(today);
+      document.getElementById('reportStartDate').value = formatDateInput(pastDate);
+      loadReport();
+    }
+
+    function loadReport() {
+      const startDate = document.getElementById('reportStartDate').value;
+      const endDate = document.getElementById('reportEndDate').value;
+
+      if (!startDate || !endDate) {
+        showAlert('Please select a date range', 'warning');
+        return;
+      }
+
+      setLoading(true, 'Loading report data...');
+
+      google.script.run
+        .withSuccessHandler(onReportLoaded)
+        .withFailureHandler(onFailure)
+        .imsGetCycleCountReport({ startDate, endDate });
+    }
+
+    function onReportLoaded(response) {
       setLoading(false);
-      document.getElementById('binContent').innerHTML = `
-        <div class="alert alert-danger">
-          <strong>Error loading data:</strong><br>
-          ${error.message || error}
-          <br><br>
-          <button class="btn btn-secondary btn-small" onclick="loadCycleCount()">Try Again</button>
-        </div>
-      `;
+
+      if (!response.success) {
+        showAlert('Error loading report: ' + (response.message || 'Unknown error'), 'danger');
+        return;
+      }
+
+      currentReport = response;
+      renderReport(response);
+    }
+
+    function renderReport(data) {
+      const s = data.summary;
+      const dateRange = data.dateRange;
+
+      // Update date range display
+      document.getElementById('reportDateRange').textContent = `${dateRange.start} - ${dateRange.end}`;
+
+      // Update summary cards
+      document.getElementById('sumBinsAudited').textContent = s.totalBinsAudited;
+      document.getElementById('sumLinesCompleted').textContent = s.totalLinesCompleted;
+      document.getElementById('sumDiscrepancies').textContent = s.totalDiscrepancies;
+      document.getElementById('sumDiscrepancies').className = 'value' + (s.totalDiscrepancies > 0 ? ' warning' : '');
+
+      const accuracyRate = (100 - parseFloat(s.discrepancyRate)).toFixed(1);
+      document.getElementById('sumAccuracy').textContent = accuracyRate + '%';
+      document.getElementById('sumAccuracy').className = 'value' + (parseFloat(s.discrepancyRate) > 10 ? ' negative' : ' positive');
+
+      document.getElementById('sumNetVariance').textContent = (s.totalVariance >= 0 ? '+' : '') + s.totalVariance;
+      document.getElementById('sumNetVariance').className = 'value' + (s.totalVariance > 0 ? ' positive' : (s.totalVariance < 0 ? ' negative' : ''));
+
+      document.getElementById('sumOver').textContent = '+' + s.positiveVariance;
+      document.getElementById('sumShort').textContent = '-' + s.negativeVariance;
+
+      // Render discrepancies table
+      const discrepancyBody = document.getElementById('discrepancyTableBody');
+      if (data.discrepancies && data.discrepancies.length > 0) {
+        discrepancyBody.innerHTML = data.discrepancies.map(d => {
+          const varClass = d.variance > 0 ? 'variance-positive' : 'variance-negative';
+          const varSign = d.variance > 0 ? '+' : '';
+          return `<tr>
+            <td>${d.binCode}</td>
+            <td>${d.fbpn}</td>
+            <td>${d.manufacturer}</td>
+            <td>${d.project}</td>
+            <td style="text-align:right">${d.systemQty}</td>
+            <td style="text-align:right">${d.countedQty}</td>
+            <td style="text-align:right" class="${varClass}">${varSign}${d.variance}</td>
+            <td>${d.notes || '-'}</td>
+            <td>${d.countedAt}</td>
+          </tr>`;
+        }).join('');
+      } else {
+        discrepancyBody.innerHTML = '<tr><td colspan="9" class="no-data">No discrepancies found in this period.</td></tr>';
+      }
+
+      // Render all audits table
+      const allAuditsBody = document.getElementById('allAuditsTableBody');
+      if (data.details && data.details.length > 0) {
+        allAuditsBody.innerHTML = data.details.map(d => {
+          let varClass = 'variance-zero';
+          if (d.variance > 0) varClass = 'variance-positive';
+          else if (d.variance < 0) varClass = 'variance-negative';
+          const varSign = d.variance > 0 ? '+' : '';
+          return `<tr>
+            <td>${d.binCode}</td>
+            <td>${d.fbpn}</td>
+            <td>${d.manufacturer}</td>
+            <td>${d.project}</td>
+            <td style="text-align:right">${d.systemQty}</td>
+            <td style="text-align:right">${d.countedQty}</td>
+            <td style="text-align:right" class="${varClass}">${varSign}${d.variance}</td>
+            <td>${d.countedAt}</td>
+            <td>${d.countedBy}</td>
+          </tr>`;
+        }).join('');
+      } else {
+        allAuditsBody.innerHTML = '<tr><td colspan="9" class="no-data">No audits completed in this period.</td></tr>';
+      }
+    }
+
+    function generatePdfReport() {
+      const startDate = document.getElementById('reportStartDate').value;
+      const endDate = document.getElementById('reportEndDate').value;
+
+      if (!startDate || !endDate) {
+        showAlert('Please select a date range first', 'warning');
+        return;
+      }
+
+      setLoading(true, 'Generating PDF report...');
+
+      google.script.run
+        .withSuccessHandler(result => {
+          setLoading(false);
+          if (result.success && result.pdfUrl) {
+            window.open(result.pdfUrl, '_blank');
+            showAlert('Report generated successfully!', 'success');
+          } else {
+            showAlert('Error generating PDF: ' + (result.message || 'Unknown error'), 'danger');
+          }
+        })
+        .withFailureHandler(error => {
+          setLoading(false);
+          showAlert('Error generating PDF: ' + error.message, 'danger');
+        })
+        .imsGenerateCycleCountReportPdf({ startDate, endDate });
+    }
+
+    function onFailure(error) {
+      console.error('Error:', error);
+      setLoading(false);
+      showAlert('Error: ' + (error.message || error), 'danger');
     }
 
     function setLoading(show, text) {
@@ -390,16 +690,16 @@
       const div = document.createElement('div');
       div.className = `alert alert-${type}`;
       div.textContent = msg;
-      
+
       const container = document.querySelector('.glass-container');
-      const insertPoint = document.querySelector('.summary-section');
-      
+      const insertPoint = document.querySelector('.tab-nav');
+
       if (insertPoint) {
-        container.insertBefore(div, insertPoint);
+        container.insertBefore(div, insertPoint.nextSibling);
       } else {
         container.prepend(div);
       }
-      
+
       setTimeout(() => div.remove(), 4000);
     }
   </script>
@@ -408,22 +708,137 @@
   <div class="glass-container">
     <div class="header">
       <h1>Cycle Count</h1>
-      <p>Count one bin at a time - navigate through bins following S-route pattern</p>
+      <p>Physical inventory counting and weekly audit reports</p>
     </div>
 
-    <div style="padding: 25px;">
-      <div class="summary-section">
-        <div>
-          <div class="summary-label">Currently Counting</div>
-          <div class="summary-value" id="currentRows">Initializing...</div>
-        </div>
-        <button class="btn btn-secondary btn-small" onclick="loadCycleCount()">Restart</button>
+    <div style="padding: 0 25px 25px 25px;">
+      <!-- Tab Navigation -->
+      <div class="tab-nav">
+        <button class="tab-btn active" data-tab="count" onclick="switchTab('count')">Count</button>
+        <button class="tab-btn" data-tab="report" onclick="switchTab('report')">Weekly Report</button>
       </div>
 
-      <div id="binContent">
-        <!-- Bins will be rendered here -->
-        <div style="text-align: center; padding: 60px 20px;">
-          <p style="color: var(--text-muted);">Waiting for data...</p>
+      <!-- Count Tab -->
+      <div id="tab-count" class="tab-content active">
+        <div class="summary-section">
+          <div>
+            <div class="summary-label">Currently Counting</div>
+            <div class="summary-value" id="currentRows">Initializing...</div>
+          </div>
+          <button class="btn btn-secondary btn-small" onclick="loadCycleCount()">Restart</button>
+        </div>
+
+        <div id="binContent">
+          <div style="text-align: center; padding: 60px 20px;">
+            <p style="color: var(--text-muted);">Waiting for data...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Report Tab -->
+      <div id="tab-report" class="tab-content">
+        <div class="report-controls">
+          <div class="form-group">
+            <label class="form-label">Start Date</label>
+            <input type="date" id="reportStartDate" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">End Date</label>
+            <input type="date" id="reportEndDate" class="form-input">
+          </div>
+          <div class="quick-select-btns">
+            <button class="btn btn-secondary" onclick="setQuickDate(7)">Last 7 Days</button>
+            <button class="btn btn-secondary" onclick="setQuickDate(14)">Last 14 Days</button>
+            <button class="btn btn-secondary" onclick="setQuickDate(30)">Last 30 Days</button>
+          </div>
+          <button class="btn btn-primary" onclick="loadReport()">Load Report</button>
+          <button class="btn btn-secondary" onclick="generatePdfReport()">Export PDF</button>
+        </div>
+
+        <div style="margin-bottom: 16px; color: var(--text-muted); font-size: 0.9rem;">
+          Report Period: <strong id="reportDateRange">-</strong>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="summary-cards">
+          <div class="summary-card">
+            <div class="label">Bins Audited</div>
+            <div class="value" id="sumBinsAudited">-</div>
+          </div>
+          <div class="summary-card">
+            <div class="label">Lines Completed</div>
+            <div class="value" id="sumLinesCompleted">-</div>
+          </div>
+          <div class="summary-card">
+            <div class="label">Discrepancies</div>
+            <div class="value" id="sumDiscrepancies">-</div>
+          </div>
+          <div class="summary-card">
+            <div class="label">Accuracy Rate</div>
+            <div class="value" id="sumAccuracy">-</div>
+          </div>
+          <div class="summary-card">
+            <div class="label">Net Variance</div>
+            <div class="value" id="sumNetVariance">-</div>
+          </div>
+          <div class="summary-card">
+            <div class="label">Over (+)</div>
+            <div class="value positive" id="sumOver">-</div>
+          </div>
+          <div class="summary-card">
+            <div class="label">Short (-)</div>
+            <div class="value negative" id="sumShort">-</div>
+          </div>
+        </div>
+
+        <!-- Discrepancies Table -->
+        <div class="report-section">
+          <h3>Discrepancies</h3>
+          <div class="report-table-wrap">
+            <table class="report-table">
+              <thead>
+                <tr>
+                  <th>Bin</th>
+                  <th>FBPN</th>
+                  <th>Manufacturer</th>
+                  <th>Project</th>
+                  <th>System Qty</th>
+                  <th>Counted Qty</th>
+                  <th>Variance</th>
+                  <th>Notes</th>
+                  <th>Counted At</th>
+                </tr>
+              </thead>
+              <tbody id="discrepancyTableBody">
+                <tr><td colspan="9" class="no-data">Select a date range and click "Load Report"</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- All Audits Table -->
+        <div class="report-section">
+          <h3>All Audits Completed</h3>
+          <div class="report-table-wrap">
+            <table class="report-table">
+              <thead>
+                <tr>
+                  <th>Bin</th>
+                  <th>FBPN</th>
+                  <th>Manufacturer</th>
+                  <th>Project</th>
+                  <th>System Qty</th>
+                  <th>Counted Qty</th>
+                  <th>Variance</th>
+                  <th>Counted At</th>
+                  <th>Counted By</th>
+                </tr>
+              </thead>
+              <tbody id="allAuditsTableBody">
+                <tr><td colspan="9" class="no-data">Select a date range and click "Load Report"</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -431,7 +846,7 @@
 
   <div id="loadingOverlay" class="loading-overlay active">
     <div class="loading-spinner"></div>
-    <div id="loadingText" class="loading-text">Loading bins...</div>
+    <div id="loadingText" class="loading-text">Loading...</div>
   </div>
 </body>
 </html>
