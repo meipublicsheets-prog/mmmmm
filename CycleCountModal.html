@@ -510,7 +510,9 @@
         .withSuccessHandler(function(result) {
           setLoading(false);
           if (result && result.success) {
-            showAlert('Count saved', 'success');
+            const variance = result.variance || 0;
+            const varMsg = variance !== 0 ? ` (Variance: ${variance > 0 ? '+' : ''}${variance})` : '';
+            showAlert('Count saved' + varMsg, 'success');
             currentIndex++;
             renderCurrentBin();
           } else {
@@ -521,7 +523,7 @@
           setLoading(false);
           showAlert('Server error: ' + error.message, 'danger');
         })
-        .imsSubmitCycleCountLine(payload);
+        .submitCycleCount(payload);
     }
 
     function skipBin() {

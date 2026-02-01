@@ -51,6 +51,108 @@ function getCycleConfig_() {
 // ============================================================================
 
 /**
+ * Wrapper function for HTML modal - calls imsGetCycleCountBins
+ * This is the function the modal calls
+ */
+function getBinsForCycleCount(filters) {
+  return imsGetCycleCountBins(filters || {});
+}
+
+/**
+ * Submit a single cycle count - handles batch creation if needed
+ * This is the wrapper function for the modal to use
+ */
+function submitCycleCount(payload) {
+  try {
+    const cfg = getCycleConfig_();
+    const ss = SpreadsheetApp.getActive();
+    const cycleSheet = ss.getSheetByName(cfg.CYCLE_COUNT_SHEET);
+
+    if (!cycleSheet) {
+      throw new Error('Cycle_Count sheet not found.');
+    }
+
+    const binCode = (payload.binCode || '').toString().toUpperCase();
+    const fbpn = (payload.correctedFbpn || payload.fbpn || payload.originalFbpn || '').toString().toUpperCase();
+    const manufacturer = (payload.manufacturer || payload.originalManufacturer || '').toString().toUpperCase();
+    const project = (payload.project || payload.originalProject || '').toString().toUpperCase();
+    const countedQty = parseFloat(payload.countedQty);
+    const notes = payload.notes || '';
+
+    if (!binCode || !fbpn || !manufacturer || !project) {
+      return { success: false, message: 'Missing required fields (binCode, fbpn, manufacturer, project).' };
+    }
+
+    if (isNaN(countedQty) || countedQty < 0) {
+      return { success: false, message: 'Invalid counted quantity.' };
+    }
+
+    // Check if there's an existing open batch for this bin/item
+    const data = cycleSheet.getDataRange().getValues();
+    const headers = data[0];
+    const idxBatch = headers.indexOf('Batch_ID');
+    const idxStatus = headers.indexOf('Status');
+    const idxBinCode = headers.indexOf('Bin_Code');
+    const idxFBPN = headers.indexOf('FBPN');
+    const idxMan = headers.indexOf('Manufacturer');
+    const idxProj = headers.indexOf('Project');
+
+    let existingBatchId = null;
+
+    for (let i = 1; i < data.length; i++) {
+      const r = data[i];
+      if (
+        (r[idxBinCode] || '').toString().toUpperCase() === binCode &&
+        (r[idxFBPN] || '').toString().toUpperCase() === fbpn &&
+        (r[idxMan] || '').toString().toUpperCase() === manufacturer &&
+        (r[idxProj] || '').toString().toUpperCase() === project &&
+        r[idxStatus] === 'Open'
+      ) {
+        existingBatchId = r[idxBatch];
+        break;
+      }
+    }
+
+    let batchId = existingBatchId;
+
+    // Create a new batch if none exists
+    if (!batchId) {
+      const batchResult = imsCreateCycleCountBatch({
+        lines: [{
+          binCode: binCode,
+          fbpn: fbpn,
+          manufacturer: manufacturer,
+          project: project
+        }]
+      });
+
+      if (!batchResult.success) {
+        return { success: false, message: 'Failed to create cycle count batch.' };
+      }
+
+      batchId = batchResult.batchId;
+    }
+
+    // Now submit the count
+    const submitResult = imsSubmitCycleCountLine({
+      batchId: batchId,
+      binCode: binCode,
+      fbpn: fbpn,
+      manufacturer: manufacturer,
+      project: project,
+      countedQty: countedQty,
+      notes: notes
+    });
+
+    return submitResult;
+
+  } catch (err) {
+    Logger.log('submitCycleCount error: ' + err.toString());
+    return { success: false, message: 'Error: ' + err.message };
+  }
+}
+
+/**
  * Fetch bins eligible for cycle counting, with filters.
  * filters: {
  *   project?: string,

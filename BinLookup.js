@@ -12,7 +12,7 @@ function searchBins(searchParams) {
     const sheet = getSheet(TABS.BIN_STOCK);
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
-    
+
     const binCodeIndex = headers.indexOf('Bin_Code');
     const binNameIndex = headers.indexOf('Bin_Name');
     const pushNumberIndex = headers.indexOf('Push_Number');
@@ -23,36 +23,50 @@ function searchBins(searchParams) {
     const currentQtyIndex = headers.indexOf('Current_Quantity');
     const stockPercentageIndex = headers.indexOf('Stock_Percentage');
     const skidIdIndex = headers.indexOf('Skid_ID');
-    
+
     const results = [];
-    
+
+    // Check if binCode and fbpn are the same value (quick lookup mode - use OR logic)
+    const binCodeSearch = (searchParams.binCode || '').trim().toLowerCase();
+    const fbpnSearch = (searchParams.fbpn || '').trim().toLowerCase();
+    const isQuickLookup = binCodeSearch && fbpnSearch && binCodeSearch === fbpnSearch;
+
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       let matches = true;
-      
-      if (searchParams.binCode && searchParams.binCode.trim() !== '') {
-        const searchTerm = searchParams.binCode.trim().toLowerCase();
+
+      // Handle binCode/fbpn search
+      if (isQuickLookup) {
+        // Quick lookup: match EITHER binCode OR fbpn
         const binCode = (row[binCodeIndex] || '').toString().toLowerCase();
-        if (!binCode.includes(searchTerm)) matches = false;
-      }
-      
-      if (searchParams.fbpn && searchParams.fbpn.trim() !== '') {
-        const searchTerm = searchParams.fbpn.trim().toLowerCase();
         const fbpn = (row[fbpnIndex] || '').toString().toLowerCase();
-        if (!fbpn.includes(searchTerm)) matches = false;
+        const matchesBinCode = binCode.includes(binCodeSearch);
+        const matchesFbpn = fbpn.includes(fbpnSearch);
+        if (!matchesBinCode && !matchesFbpn) matches = false;
+      } else {
+        // Standard search: each filter is applied separately with AND logic
+        if (binCodeSearch) {
+          const binCode = (row[binCodeIndex] || '').toString().toLowerCase();
+          if (!binCode.includes(binCodeSearch)) matches = false;
+        }
+
+        if (fbpnSearch) {
+          const fbpn = (row[fbpnIndex] || '').toString().toLowerCase();
+          if (!fbpn.includes(fbpnSearch)) matches = false;
+        }
       }
-      
+
       if (searchParams.manufacturer && searchParams.manufacturer !== '') {
         if (row[manufacturerIndex] !== searchParams.manufacturer) matches = false;
       }
-      
+
       if (searchParams.project && searchParams.project !== '') {
         if (row[projectIndex] !== searchParams.project) matches = false;
       }
-      
+
       if (searchParams.stockStatus && searchParams.stockStatus !== '') {
         const currentQty = parseInt(row[currentQtyIndex]) || 0;
-        
+
         if (searchParams.stockStatus === 'empty' && currentQty > 0) {
           matches = false;
         } else if (searchParams.stockStatus === 'occupied' && currentQty === 0) {
@@ -61,7 +75,7 @@ function searchBins(searchParams) {
           matches = false;
         }
       }
-      
+
       if (matches) {
         results.push({
           binCode: row[binCodeIndex] || '',
@@ -78,9 +92,9 @@ function searchBins(searchParams) {
         });
       }
     }
-    
+
     return results;
-    
+
   } catch (error) {
     Logger.log('Error searching bins: ' + error.toString());
     throw new Error('Error searching bins: ' + error.toString());
