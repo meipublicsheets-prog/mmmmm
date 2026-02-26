@@ -28,8 +28,6 @@ function onOpen(e) {
     .addItem('Cycle Count', 'openCycleCountModal');
 
   ui.createMenu('IMS')
-    .addItem('Open Customer Portal', 'showCustomerPortal')
-    .addSeparator()
     .addItem('Inbound Delivery Form', 'openInboundModal')
     .addItem('Inbound Manager (Undo/Labels)', 'openInboundManagerModal')
     .addSeparator()
@@ -134,12 +132,6 @@ function openCurrentItemsModal() {
   const html = HtmlService.createTemplateFromFile('CurrentItemsModal')
     .evaluate().setWidth(1100).setHeight(820);
   SpreadsheetApp.getUi().showModalDialog(html, 'Current Items');
-}
-
-function showCustomerPortal() {
-  const html = HtmlService.createTemplateFromFile('CustomerPortalUI')
-    .evaluate().setTitle('Inventory Portal');
-  SpreadsheetApp.getUi().showSidebar(html);
 }
 
 function openGeneratePastInboundLabelsByDateModal() {
@@ -951,51 +943,6 @@ function api_getSkidById(skidId) {
     }
   }
   return { success:false, message:`Skid not found: ${id}` };
-}
-
-// ============================================================================
-// CUSTOMER PORTAL STUBS (Not yet implemented - were library placeholders)
-// ============================================================================
-
-function authenticateUser(email) {
-  // This was a library placeholder - implement based on getUserContext
-  const context = getUserContext();
-  if (context.authenticated && context.email.toLowerCase() === email.toLowerCase()) {
-    return context;
-  }
-  return { authenticated: false, error: 'User not authenticated' };
-}
-
-function searchInventoryForCustomer(email, criteria) {
-  throw new Error('searchInventoryForCustomer is not yet implemented');
-}
-
-function getAvailableFBPNsForOrder(email) {
-  throw new Error('getAvailableFBPNsForOrder is not yet implemented');
-}
-
-function submitCustomerOrderFromPortal(email, data) {
-  throw new Error('submitCustomerOrderFromPortal is not yet implemented');
-}
-
-function getUserProjectAccess(email) {
-  const context = getUserContext();
-  if (context.authenticated && context.email.toLowerCase() === email.toLowerCase()) {
-    return context.projectAccess || [];
-  }
-  return [];
-}
-
-function getProjectsForPortal() {
-  // Use getProjects from CustomerOrderBackend.gs
-  if (typeof getProjects === 'function') {
-    return getProjects();
-  }
-  return [];
-}
-
-function getOutOfStockItems(email) {
-  throw new Error('getOutOfStockItems is not yet implemented');
 }
 
 // ============================================================================
