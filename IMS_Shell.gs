@@ -143,6 +143,72 @@ function openGeneratePastInboundLabelsByDateModal() {
 }
 
 // ----------------------------------------------------------------------------
+// DROPDOWN DATA (for CustomerOrderModal)
+// Reads from both Support_Sheet and Customer_Access to ensure all companies/projects appear
+// ----------------------------------------------------------------------------
+function getCompanies() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const companies = new Set();
+
+  // Primary source: Support_Sheet column A
+  const supportSheet = ss.getSheetByName('Support_Sheet');
+  if (supportSheet) {
+    const data = supportSheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0]) companies.add(String(data[i][0]).trim());
+    }
+  }
+
+  // Secondary source: Customer_Access "Company Name" column
+  const accessSheet = ss.getSheetByName('Customer_Access');
+  if (accessSheet) {
+    const data = accessSheet.getDataRange().getValues();
+    const headers = data[0].map(h => String(h || '').toLowerCase().trim());
+    const companyCol = headers.indexOf('company name');
+    if (companyCol >= 0) {
+      for (let i = 1; i < data.length; i++) {
+        const co = String(data[i][companyCol] || '').trim();
+        if (co) companies.add(co);
+      }
+    }
+  }
+
+  return Array.from(companies).sort();
+}
+
+function getProjects() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const projects = new Set();
+
+  // Primary source: Support_Sheet column B
+  const supportSheet = ss.getSheetByName('Support_Sheet');
+  if (supportSheet) {
+    const data = supportSheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][1]) projects.add(String(data[i][1]).trim());
+    }
+  }
+
+  // Secondary source: Customer_Access "Project_Access" column
+  const accessSheet = ss.getSheetByName('Customer_Access');
+  if (accessSheet) {
+    const data = accessSheet.getDataRange().getValues();
+    const headers = data[0].map(h => String(h || '').toLowerCase().trim());
+    const projectCol = headers.indexOf('project_access');
+    if (projectCol >= 0) {
+      for (let i = 1; i < data.length; i++) {
+        const raw = String(data[i][projectCol] || '').trim();
+        if (raw && raw.toUpperCase() !== 'ALL') {
+          raw.split(',').forEach(p => { const t = p.trim(); if (t) projects.add(t); });
+        }
+      }
+    }
+  }
+
+  return Array.from(projects).sort();
+}
+
+// ----------------------------------------------------------------------------
 // INBOUND SUBMISSION WRAPPER
 // Adds label normalization for InboundModal.html compatibility
 // ----------------------------------------------------------------------------
